@@ -1,63 +1,75 @@
-import Image from "next/image";
+import Link from "next/link";
 
-export default function Home() {
+const HERO_IMAGE =
+  "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=2000&q=80";
+
+export default function HomePage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="relative flex min-h-screen flex-col">
+      <div
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: `url('${HERO_IMAGE}')` }}
+        aria-hidden
+      />
+      <div className="absolute inset-0 bg-slate-950/70" aria-hidden />
+
+      <header className="relative z-20 flex items-center justify-end gap-6 px-6 py-6 md:px-10">
+        <Link
+          href="/marketplace"
+          className="text-sm font-medium text-white/80 transition-colors hover:text-white"
+        >
+          Marketplace
+        </Link>
+        <Link
+          href="/create"
+          className="text-sm font-medium text-white/80 transition-colors hover:text-white"
+        >
+          For talent
+        </Link>
+        <Link
+          href="/admin/resources"
+          className="text-sm font-medium text-white/80 transition-colors hover:text-white"
+        >
+          Admin
+        </Link>
+      </header>
+
+      <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pb-16 pt-8 md:px-8">
+        <div className="w-full max-w-xl rounded-3xl border border-white/20 bg-white/10 p-8 shadow-2xl shadow-black/40 backdrop-blur-xl md:p-12">
+          <div className="mb-8 flex flex-col items-center gap-3">
+            <div
+              className="flex h-14 w-14 items-center justify-center rounded-2xl text-xl font-bold tracking-tight text-white shadow-lg"
+              style={{ background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)" }}
+              aria-hidden
+            >
+              P
+            </div>
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
+              Procal
+            </span>
+          </div>
+
+          <h1 className="text-center text-3xl font-bold leading-tight tracking-tight text-white md:text-4xl md:leading-tight">
+            Connecting Talent with Opportunity
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-4 text-center text-base leading-relaxed text-white/75 md:text-lg">
+            Discover trusted consultants and specialists.
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+          <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Link
+              href="/marketplace"
+              className="flex min-h-[3.25rem] items-center justify-center rounded-2xl bg-orange-500 px-6 py-4 text-center text-base font-semibold text-white shadow-lg shadow-orange-900/30 transition hover:bg-orange-600 hover:shadow-xl"
+            >
+              I&apos;m a Company
+            </Link>
+            <Link
+              href="/create"
+              className="flex min-h-[3.25rem] items-center justify-center rounded-2xl border border-white/10 bg-slate-900 px-6 py-4 text-center text-base font-semibold text-white shadow-lg shadow-black/30 transition hover:bg-slate-800"
+            >
+              I&apos;m Talent
+            </Link>
+          </div>
         </div>
       </main>
     </div>

@@ -1,0 +1,111 @@
+import { AppTopNav } from "@/components/app-top-nav";
+import { supabase } from "@/lib/supabase";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+type PageProps = {
+  params: Promise<{ id: string }>;
+};
+
+function formatHourlyRateZar(rate: number | null) {
+  if (rate == null) return "Rate on request";
+  return `${new Intl.NumberFormat("en-ZA", {
+    style: "currency",
+    currency: "ZAR",
+  }).format(rate)} / hr`;
+}
+
+export default async function ConsultantProfilePage({ params }: PageProps) {
+  const { id } = await params;
+
+  const { data, error } = await supabase
+    .from("resources")
+    .select("*")
+    .eq("id", id)
+    .eq("profile_status", "approved")
+    .single();
+
+  if (error || !data) {
+    notFound();
+  }
+
+  const name = data.name as string;
+  const headline = (data.headline as string | null) ?? null;
+  const location = (data.location as string | null) ?? null;
+  const hourly_rate = data.hourly_rate as number | null;
+  const years_experience = data.years_experience as number | null;
+  const bio = (data.bio as string | null) ?? null;
+
+  return (
+    <>
+      <AppTopNav />
+      <main className="mx-auto min-h-screen w-full max-w-3xl bg-white px-6 py-10 md:px-10 md:py-16">
+      <Link
+        href="/marketplace"
+        className="text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-900"
+      >
+        ← Back to marketplace
+      </Link>
+
+      <header className="mt-8 space-y-3 border-b border-zinc-200 pb-10">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">Consultant</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 md:text-4xl">{name}</h1>
+        <p className="text-lg text-zinc-600">{headline ?? "Consultant"}</p>
+      </header>
+
+      <dl className="mt-10 grid grid-cols-1 gap-6 border-b border-zinc-200 pb-10 sm:grid-cols-3">
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Location</dt>
+          <dd className="mt-1 text-base font-medium text-zinc-900">{location ?? "Remote"}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Hourly rate</dt>
+          <dd className="mt-1 text-base font-medium text-zinc-900">
+            {formatHourlyRateZar(hourly_rate)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Experience</dt>
+          <dd className="mt-1 text-base font-medium text-zinc-900">
+            {years_experience != null ? `${years_experience} years` : "Not listed"}
+          </dd>
+        </div>
+      </dl>
+
+      <section className="mt-10">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">About</h2>
+        <p className="mt-3 text-base leading-relaxed text-zinc-700">{bio ?? "No bio provided."}</p>
+      </section>
+
+      <section className="mt-12 rounded-2xl border border-zinc-200 bg-zinc-50/40 p-6 md:p-8">
+        <h2 className="text-sm font-semibold text-zinc-900">Availability</h2>
+        <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+          Calendar and booking windows will appear here once scheduling is enabled.
+        </p>
+      </section>
+
+      <section className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50/40 p-6 md:p-8">
+        <h2 className="text-sm font-semibold text-zinc-900">Documents and verification</h2>
+        <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+          Credentials and compliance documents will be listed here after verification is connected.
+        </p>
+      </section>
+
+      <div className="mt-12 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        <Link
+          href={`/consultants/${id}/request-interview`}
+          className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-zinc-950 px-6 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 sm:flex-none"
+        >
+          Request interview
+        </Link>
+        <button
+          type="button"
+          className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full border border-zinc-300 bg-white px-6 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-50 sm:flex-none"
+        >
+          Propose engagement
+        </button>
+      </div>
+      </main>
+    </>
+  );
+}

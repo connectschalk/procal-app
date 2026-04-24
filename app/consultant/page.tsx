@@ -2,14 +2,16 @@
 
 import { AppTopNav } from "@/components/app-top-nav";
 import { supabase } from "@/lib/supabase";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
-const STORAGE_KEY = "procal.companyEmail";
+const STORAGE_KEY = "procal.consultantEmail";
 
 type InterviewRequestRow = {
   id: string;
   resource_id: string;
   company_name: string;
+  requester_name: string;
   message: string | null;
   proposed_slot_1: string | null;
   proposed_slot_2: string | null;
@@ -125,12 +127,8 @@ function kindTabClass(active: boolean) {
   return "rounded-full border border-zinc-200/90 bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50/80";
 }
 
-function consultantLabelInterview(row: InterviewRequestRow) {
-  return row.consultant_name != null && row.consultant_name.trim() !== "" ? row.consultant_name : "Consultant";
-}
-
-function consultantLabelProposal(row: EngagementProposalRow) {
-  return row.consultant_name != null && row.consultant_name.trim() !== "" ? row.consultant_name : "Consultant";
+function profileLabel(name: string | null) {
+  return name != null && name.trim() !== "" ? name.trim() : "Your profile";
 }
 
 function summarizeInterviews(rows: InterviewRequestRow[]) {
@@ -149,11 +147,13 @@ function summarizeProposals(rows: EngagementProposalRow[]) {
   return { total: rows.length, accepted };
 }
 
-export default function CompanyDashboardPage() {
+export default function ConsultantDashboardPage() {
   const [email, setEmail] = useState("");
   const [interviewRows, setInterviewRows] = useState<InterviewRequestRow[] | null>(null);
   const [proposalRows, setProposalRows] = useState<EngagementProposalRow[] | null>(null);
   const [dashboardEmail, setDashboardEmail] = useState<string | null>(null);
+  const [noProfileForEmail, setNoProfileForEmail] = useState(false);
+  const [hasUnclaimedProfile, setHasUnclaimedProfile] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [interviewFilter, setInterviewFilter] = useState<InterviewStatusFilter>("all");
@@ -181,23 +181,108 @@ export default function CompanyDashboardPage() {
     setEmail(trimmed);
     setLoading(true);
     setError(null);
+    setNoProfileForEmail(false);
+    setHasUnclaimedProfile(false);
     setInterviewFilter("all");
     setKindTab("all");
+
+    const { data: resourceRows, error: resourcesError } = await supabase
+      .from("resources")
+      .select("id, name, claimed, available_from")
+      .ilike("contact_email", trimmed);
+
+    if (resourcesError) {
+      setError(resourcesError.message);
+      setInterviewRows(null);
+      setProposalRows(null);
+      setDashboardEmail(null);
+      setHasUnclaimedProfile(false);
+      setLoading(false);
+      return;
+    }
+
+    const resources = resourceRows ?? [];
+    if (resources.length === 0) {
+      setInterviewRows([]);
+      setProposalRows([]);
+      setDashboardEmail(trimmed);
+      setNoProfileForEmail(true);
+      setHasUnclaimedProfile(false);
+      setLoading(false);
+      return;
+    }
+
+    setHasUnclaimedProfile(
+      resources.some((r) => {
+        const c = (r as { claimed?: boolean | null }).claimed;
+        return c !== true;
+      }),
+    );
+
+    const nameByResourceId: Record<string, string> = {};
+    const availableFromByResourceId: Record<string, string | null> = {};
+    const nextBlockedByResourceId: Record<string, string | null> = {};
+    const resourceIds: string[] = [];
+    for (const row of resources) {
+      const id = row.id as string;
+      resourceIds.push(id);
+      const name = row.name as string | null;
+      if (name != null && name.trim() !== "") {
+        nameByResourceId[id] = name.trim();
+      }
+      const af = row.available_from as string | null | undefined;
+      availableFromByResourceId[id] =
+        af != null && String(af).trim() !== "" ? String(af).slice(0, 10) : null;
+    }
+
+    let blockedDateRows: { resource_id: string; blocked_date: string }[] = [];
+    if (resourceIds.length > 0) {
+      const { data: blockedData, error: blockedError } = await supabase
+        .from("resource_blocked_dates")
+        .select("resource_id, blocked_date")
+        .in("resource_id", resourceIds);
+
+      if (!blockedError && blockedData != null) {
+        blockedDateRows = blockedData.map((b) => ({
+          resource_id: b.resource_id as string,
+          blocked_date: String(b.blocked_date).slice(0, 10),
+        }));
+      }
+    }
+
+    const today = localIsoDate(new Date());
+    const upcomingBlockedByResource = new Map<string, string[]>();
+    for (const b of blockedDateRows) {
+      if (b.blocked_date < today) continue;
+      const list = upcomingBlockedByResource.get(b.resource_id);
+      if (list == null) {
+        upcomingBlockedByResource.set(b.resource_id, [b.blocked_date]);
+      } else {
+        list.push(b.blocked_date);
+      }
+    }
+    for (const list of upcomingBlockedByResource.values()) {
+      list.sort((a, c) => a.localeCompare(c));
+    }
+    for (const id of resourceIds) {
+      const upcoming = upcomingBlockedByResource.get(id);
+      nextBlockedByResourceId[id] = upcoming != null && upcoming.length > 0 ? upcoming[0] : null;
+    }
 
     const [irRes, epRes] = await Promise.all([
       supabase
         .from("interview_requests")
         .select(
-          "id, resource_id, company_name, message, proposed_slot_1, proposed_slot_2, proposed_slot_3, selected_slot, status, created_at",
+          "id, resource_id, company_name, requester_name, message, proposed_slot_1, proposed_slot_2, proposed_slot_3, selected_slot, status, created_at",
         )
-        .ilike("requester_email", trimmed)
+        .in("resource_id", resourceIds)
         .order("created_at", { ascending: false }),
       supabase
         .from("engagement_proposals")
         .select(
           "id, resource_id, company_name, requester_name, proposed_start_date, proposed_end_date, scope, proposed_rate, status, created_at",
         )
-        .ilike("requester_email", trimmed)
+        .in("resource_id", resourceIds)
         .order("created_at", { ascending: false }),
     ]);
 
@@ -232,6 +317,7 @@ export default function CompanyDashboardPage() {
       id: r.id as string,
       resource_id: r.resource_id as string,
       company_name: r.company_name as string,
+      requester_name: (r.requester_name as string) ?? "",
       message: (r.message as string | null) ?? null,
       proposed_slot_1: (r.proposed_slot_1 as string | null) ?? null,
       proposed_slot_2: (r.proposed_slot_2 as string | null) ?? null,
@@ -249,7 +335,7 @@ export default function CompanyDashboardPage() {
       id: r.id as string,
       resource_id: r.resource_id as string,
       company_name: r.company_name as string,
-      requester_name: r.requester_name as string,
+      requester_name: (r.requester_name as string) ?? "",
       proposed_start_date: (r.proposed_start_date as string | null) ?? null,
       proposed_end_date: (r.proposed_end_date as string | null) ?? null,
       scope: (r.scope as string | null) ?? null,
@@ -257,65 +343,6 @@ export default function CompanyDashboardPage() {
       status: (r.status as string) ?? "proposed",
       created_at: (r.created_at as string) ?? "",
     }));
-
-    const uniqueResourceIds = [
-      ...new Set([...baseInterviews.map((r) => r.resource_id), ...baseProposals.map((r) => r.resource_id)]),
-    ];
-    const nameByResourceId: Record<string, string> = {};
-    const availableFromByResourceId: Record<string, string | null> = {};
-    const nextBlockedByResourceId: Record<string, string | null> = {};
-
-    if (uniqueResourceIds.length > 0) {
-      const { data: resourceRows } = await supabase
-        .from("resources")
-        .select("id, name, available_from")
-        .in("id", uniqueResourceIds);
-
-      for (const row of resourceRows ?? []) {
-        const id = row.id as string;
-        const name = row.name as string | null;
-        if (name != null && name.trim() !== "") {
-          nameByResourceId[id] = name.trim();
-        }
-        const af = row.available_from as string | null | undefined;
-        availableFromByResourceId[id] =
-          af != null && String(af).trim() !== "" ? String(af).slice(0, 10) : null;
-      }
-
-      let blockedDateRows: { resource_id: string; blocked_date: string }[] = [];
-      const { data: blockedData, error: blockedError } = await supabase
-        .from("resource_blocked_dates")
-        .select("resource_id, blocked_date")
-        .in("resource_id", uniqueResourceIds);
-
-      if (!blockedError && blockedData != null) {
-        blockedDateRows = blockedData.map((b) => ({
-          resource_id: b.resource_id as string,
-          blocked_date: String(b.blocked_date).slice(0, 10),
-        }));
-      }
-
-      const today = localIsoDate(new Date());
-      const upcomingBlockedByResource = new Map<string, string[]>();
-      for (const b of blockedDateRows) {
-        if (b.blocked_date < today) continue;
-        const list = upcomingBlockedByResource.get(b.resource_id);
-        if (list == null) {
-          upcomingBlockedByResource.set(b.resource_id, [b.blocked_date]);
-        } else {
-          list.push(b.blocked_date);
-        }
-      }
-      for (const list of upcomingBlockedByResource.values()) {
-        list.sort((a, c) => a.localeCompare(c));
-      }
-
-      for (const id of uniqueResourceIds) {
-        const upcoming = upcomingBlockedByResource.get(id);
-        nextBlockedByResourceId[id] =
-          upcoming != null && upcoming.length > 0 ? upcoming[0] : null;
-      }
-    }
 
     setInterviewRows(
       irRes.error
@@ -338,6 +365,7 @@ export default function CompanyDashboardPage() {
           })),
     );
     setDashboardEmail(trimmed);
+    setNoProfileForEmail(false);
     setLoading(false);
   }, []);
 
@@ -379,6 +407,8 @@ export default function CompanyDashboardPage() {
     setInterviewRows(null);
     setProposalRows(null);
     setDashboardEmail(null);
+    setNoProfileForEmail(false);
+    setHasUnclaimedProfile(false);
     setError(null);
     setInterviewFilter("all");
     setKindTab("all");
@@ -387,7 +417,7 @@ export default function CompanyDashboardPage() {
   const hasLoaded = interviewRows !== null && proposalRows !== null;
   const totalInterviews = interviewRows?.length ?? 0;
   const totalProposals = proposalRows?.length ?? 0;
-  const bothEmpty = hasLoaded && totalInterviews === 0 && totalProposals === 0;
+  const bothEmpty = hasLoaded && !noProfileForEmail && totalInterviews === 0 && totalProposals === 0;
 
   return (
     <>
@@ -396,19 +426,37 @@ export default function CompanyDashboardPage() {
         <header className="space-y-2">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2">
-              <h1 className="text-2xl font-semibold tracking-tight text-zinc-950 md:text-3xl">Company Dashboard</h1>
+              <h1 className="text-2xl font-semibold tracking-tight text-zinc-950 md:text-3xl">Consultant Dashboard</h1>
               <p className="text-sm leading-relaxed text-zinc-600">
-                Track your interview requests and engagement proposals in one place.
+                Enter your email to view interview requests and engagement proposals tied to your Procal profile.
               </p>
             </div>
             {dashboardEmail != null ? (
-              <button
-                type="button"
-                onClick={handleChangeEmail}
-                className="shrink-0 self-start text-sm font-medium text-orange-700 underline-offset-2 hover:underline"
-              >
-                Change email
-              </button>
+              <div className="flex shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
+                {hasLoaded && !noProfileForEmail ? (
+                  <>
+                    <Link
+                      href="/consultant/edit"
+                      className="inline-flex items-center justify-center rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-50"
+                    >
+                      Edit profile
+                    </Link>
+                    <Link
+                      href="/consultant/availability"
+                      className="inline-flex items-center justify-center rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-50"
+                    >
+                      Manage availability
+                    </Link>
+                  </>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={handleChangeEmail}
+                  className="self-start text-sm font-medium text-orange-700 underline-offset-2 hover:underline sm:self-center"
+                >
+                  Change email
+                </button>
+              </div>
             ) : null}
           </div>
           {dashboardEmail != null ? (
@@ -421,14 +469,14 @@ export default function CompanyDashboardPage() {
           className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-zinc-50/40 p-5 md:flex-row md:items-end md:gap-4 md:p-6"
         >
           <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-            <span className="font-medium text-zinc-800">Work email</span>
+            <span className="font-medium text-zinc-800">Profile contact email</span>
             <input
               required
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
-              placeholder="you@company.com"
+              placeholder="you@example.com"
               className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none ring-zinc-950 placeholder:text-zinc-400 focus:ring-2"
             />
           </label>
@@ -441,21 +489,41 @@ export default function CompanyDashboardPage() {
           </button>
         </form>
 
+        {hasLoaded && !noProfileForEmail && hasUnclaimedProfile ? (
+          <div className="flex flex-col gap-3 rounded-2xl border border-amber-200/90 bg-amber-50/80 px-5 py-4 md:flex-row md:items-center md:justify-between md:px-6">
+            <p className="text-sm font-medium text-amber-950">
+              Claim your profile to manage your information
+            </p>
+            <Link
+              href="/consultant/claim"
+              className="inline-flex shrink-0 items-center justify-center rounded-full bg-amber-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-800"
+            >
+              Claim profile
+            </Link>
+          </div>
+        ) : null}
+
         {error ? (
           <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
         ) : null}
 
-        {hasLoaded && !error && bothEmpty ? (
+        {hasLoaded && noProfileForEmail ? (
           <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
-            No interview requests or engagement proposals found for this email.
+            No consultant profile found for this email.
           </p>
         ) : null}
 
-        {hasLoaded && !error && !bothEmpty ? (
+        {hasLoaded && !noProfileForEmail && !error && bothEmpty ? (
+          <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+            No interview requests or engagement proposals yet for your profile(s).
+          </p>
+        ) : null}
+
+        {hasLoaded && !noProfileForEmail && !error && !bothEmpty ? (
           <>
             <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <div className="rounded-2xl border border-zinc-200/90 bg-white p-4 shadow-sm shadow-zinc-950/[0.03]">
-                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Total interviews</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Total interview requests</p>
                 <p className="mt-2 text-2xl font-semibold tabular-nums text-zinc-950">
                   {interviewCounts?.total ?? 0}
                 </p>
@@ -538,16 +606,22 @@ export default function CompanyDashboardPage() {
                           key={row.id}
                           className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/5 md:p-6"
                         >
-                          <p className="text-sm text-zinc-600">
-                            <span className="font-medium text-zinc-800">Consultant:</span>{" "}
-                            {consultantLabelInterview(row)}
+                          <p className="text-xs text-zinc-500">
+                            <span className="font-medium text-zinc-600">Profile:</span>{" "}
+                            {profileLabel(row.consultant_name)}
                           </p>
                           <ConsultantAvailabilityContext
                             availableFrom={row.available_from}
                             nextBlocked={row.next_blocked_date}
                           />
                           <div className="mt-2 flex flex-col gap-2 border-b border-zinc-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
-                            <p className="text-base font-semibold tracking-tight text-zinc-950">{row.company_name}</p>
+                            <div>
+                              <p className="text-base font-semibold tracking-tight text-zinc-950">{row.company_name}</p>
+                              <p className="mt-1 text-sm text-zinc-600">
+                                <span className="font-medium text-zinc-800">Contact:</span>{" "}
+                                {row.requester_name.trim() || "—"}
+                              </p>
+                            </div>
                             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                               <span
                                 className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${statusBadgeClasses(row.status)}`}
@@ -619,9 +693,9 @@ export default function CompanyDashboardPage() {
                         key={row.id}
                         className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/5 md:p-6"
                       >
-                        <p className="text-sm text-zinc-600">
-                          <span className="font-medium text-zinc-800">Consultant:</span>{" "}
-                          {consultantLabelProposal(row)}
+                        <p className="text-xs text-zinc-500">
+                          <span className="font-medium text-zinc-600">Profile:</span>{" "}
+                          {profileLabel(row.consultant_name)}
                         </p>
                         <ConsultantAvailabilityContext
                           availableFrom={row.available_from}
@@ -630,8 +704,9 @@ export default function CompanyDashboardPage() {
                         <div className="mt-2 flex flex-col gap-2 border-b border-zinc-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <p className="text-base font-semibold tracking-tight text-zinc-950">{row.company_name}</p>
-                            <p className="mt-1 text-xs text-zinc-500">
-                              <span className="font-medium text-zinc-600">Contact:</span> {row.requester_name}
+                            <p className="mt-1 text-sm text-zinc-600">
+                              <span className="font-medium text-zinc-800">Requester:</span>{" "}
+                              {row.requester_name.trim() || "—"}
                             </p>
                           </div>
                           <div className="flex flex-wrap items-center gap-2 sm:justify-end">

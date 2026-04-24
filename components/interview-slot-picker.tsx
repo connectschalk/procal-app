@@ -1,6 +1,7 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 const DAY_START_MIN = 9 * 60;
 const DAY_END_MIN = 20 * 60;
@@ -35,6 +36,45 @@ function getNext7Days(from: Date): Date[] {
 
 function calendarDayKey(d: Date) {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function localIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function formatMediumDate(isoDate: string): string {
+  const d = new Date(`${isoDate}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return isoDate;
+  return new Intl.DateTimeFormat("en-ZA", { dateStyle: "medium" }).format(d);
+}
+
+type AvailabilityReady = {
+  status: "ready";
+  availableFrom: string | null;
+  blockedIso: Set<string>;
+};
+
+type AvailabilityState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | AvailabilityReady;
+
+function isBeforeAvailable(d: Date, availableFrom: string | null): boolean {
+  if (availableFrom == null || availableFrom.trim() === "") return false;
+  return localIsoDate(d) < availableFrom;
+}
+
+function isBlockedDay(d: Date, blockedIso: Set<string>): boolean {
+  return blockedIso.has(localIsoDate(d));
+}
+
+function isDaySelectable(d: Date, av: AvailabilityReady): boolean {
+  if (isBeforeAvailable(d, av.availableFrom)) return false;
+  if (isBlockedDay(d, av.blockedIso)) return false;
+  return true;
 }
 
 function sameLocalCalendarDay(a: Date, b: Date) {
@@ -105,22 +145,90 @@ function formatSlotSummary(iso: string, durationMin: InterviewDurationMin) {
 export type InterviewSlotPickerProps = {
   selectedSlots: string[];
   onChange: (slots: string[]) => void;
+  /** When set, loads `available_from` and blocked dates to fade/disable days (visual guide only). */
+  resourceId?: string;
 };
 
-export function InterviewSlotPicker({ selectedSlots, onChange }: InterviewSlotPickerProps) {
+export function InterviewSlotPicker({ selectedSlots, onChange, resourceId }: InterviewSlotPickerProps) {
   const days = useMemo(() => getNext7Days(new Date()), []);
   const [selectedDate, setSelectedDate] = useState<Date>(() => days[0] ?? new Date());
   const [durationMin, setDurationMin] = useState<InterviewDurationMin>(30);
+  const [availability, setAvailability] = useState<AvailabilityState>({ status: "idle" });
   const slotMinutes = useMemo(() => slotMinutesList(), []);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const selectedDateKey = calendarDayKey(selectedDate);
+
+  useEffect(() => {
+    if (!resourceId?.trim()) {
+      queueMicrotask(() => {
+        setAvailability({ status: "ready", availableFrom: null, blockedIso: new Set() });
+      });
+      return;
+    }
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      setAvailability({ status: "loading" });
+    });
+
+    void (async () => {
+      const [rRes, bRes] = await Promise.all([
+        supabase.from("resources").select("available_from").eq("id", resourceId.trim()).maybeSingle(),
+        supabase.from("resource_blocked_dates").select("blocked_date").eq("resource_id", resourceId.trim()),
+      ]);
+
+      if (cancelled) return;
+
+      if (rRes.error) {
+        setAvailability({ status: "ready", availableFrom: null, blockedIso: new Set() });
+        return;
+      }
+
+      const afRaw = rRes.data?.available_from as string | null | undefined;
+      const availableFrom =
+        afRaw != null && String(afRaw).trim() !== "" ? String(afRaw).slice(0, 10) : null;
+
+      const blockedIso = new Set<string>();
+      if (!bRes.error) {
+        for (const row of bRes.data ?? []) {
+          const bd = (row as { blocked_date?: string }).blocked_date;
+          if (bd != null) blockedIso.add(String(bd).slice(0, 10));
+        }
+      }
+
+      setAvailability({ status: "ready", availableFrom, blockedIso });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resourceId]);
+
+  const availabilityReady: AvailabilityReady | null =
+    availability.status === "ready" ? availability : null;
+
+  useEffect(() => {
+    if (availabilityReady == null) return;
+    if (isDaySelectable(selectedDate, availabilityReady)) return;
+    const next = days.find((d) => isDaySelectable(d, availabilityReady));
+    if (next) {
+      queueMicrotask(() => {
+        setSelectedDate(next);
+      });
+    }
+  }, [availabilityReady, selectedDateKey, days, selectedDate]);
 
   useLayoutEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
     scrollTimeRailToSlot(container, DAY_START_MIN);
   }, [selectedDateKey]);
+
+  function isSelectedDayRestricted(): boolean {
+    if (availabilityReady == null) return false;
+    return !isDaySelectable(selectedDate, availabilityReady);
+  }
 
   function isSlotInPast(minutesFromMidnight: number) {
     const now = new Date();
@@ -134,6 +242,7 @@ export function InterviewSlotPicker({ selectedSlots, onChange }: InterviewSlotPi
   }
 
   function toggleSlot(minutesFromMidnight: number) {
+    if (isSelectedDayRestricted()) return;
     if (isSlotInPast(minutesFromMidnight)) return;
     const iso = isoForSlot(minutesFromMidnight);
     const idx = selectedSlots.indexOf(iso);
@@ -149,6 +258,8 @@ export function InterviewSlotPicker({ selectedSlots, onChange }: InterviewSlotPi
     return selectedSlots.includes(isoForSlot(minutesFromMidnight));
   }
 
+  const selectedDayRestricted = isSelectedDayRestricted();
+
   return (
     <div className="flex flex-col gap-5 md:flex-row md:items-stretch md:gap-6">
       {/* Date column / mobile: horizontal strip */}
@@ -160,27 +271,73 @@ export function InterviewSlotPicker({ selectedSlots, onChange }: InterviewSlotPi
           const active = calendarDayKey(d) === selectedDateKey;
           const wk = new Intl.DateTimeFormat("en-ZA", { weekday: "short" }).format(d);
           const mon = new Intl.DateTimeFormat("en-ZA", { month: "short" }).format(d);
+          const before =
+            availabilityReady != null && isBeforeAvailable(d, availabilityReady.availableFrom);
+          const blocked = availabilityReady != null && isBlockedDay(d, availabilityReady.blockedIso);
+          const unavailable = before || blocked;
+          const fromLabel =
+            availabilityReady?.availableFrom != null
+              ? formatMediumDate(availabilityReady.availableFrom)
+              : "";
+          const title = blocked
+            ? "Unavailable"
+            : before && fromLabel
+              ? `Available from ${fromLabel}`
+              : undefined;
           return (
             <button
               key={calendarDayKey(d)}
               type="button"
               aria-pressed={active}
-              onClick={() => setSelectedDate(d)}
+              title={title}
+              disabled={unavailable}
+              onClick={() => {
+                if (unavailable) return;
+                setSelectedDate(d);
+              }}
               className={`flex min-w-[4.75rem] shrink-0 flex-col items-center rounded-xl border px-2.5 py-2.5 text-center transition md:min-w-0 md:px-2 ${
-                active
-                  ? "border-orange-400/90 bg-orange-50 shadow-sm shadow-orange-950/5 ring-2 ring-orange-400/70"
-                  : "border-zinc-200/90 bg-white hover:border-zinc-300 hover:bg-zinc-50/80"
+                unavailable
+                  ? blocked
+                    ? "cursor-not-allowed border-red-200/90 bg-red-50/50 opacity-90"
+                    : "cursor-not-allowed border-zinc-200/60 bg-zinc-50/80 opacity-45"
+                  : active
+                    ? "border-orange-400/90 bg-orange-50 shadow-sm shadow-orange-950/5 ring-2 ring-orange-400/70"
+                    : "border-zinc-200/90 bg-white hover:border-zinc-300 hover:bg-zinc-50/80"
               }`}
             >
               <span
-                className={`text-[10px] font-semibold uppercase tracking-wide ${active ? "text-orange-800" : "text-zinc-500"}`}
+                className={`text-[10px] font-semibold uppercase tracking-wide ${
+                  unavailable
+                    ? blocked
+                      ? "text-red-800/90"
+                      : "text-zinc-400"
+                    : active
+                      ? "text-orange-800"
+                      : "text-zinc-500"
+                }`}
               >
                 {wk}
               </span>
-              <span className={`mt-0.5 text-lg font-semibold tabular-nums ${active ? "text-zinc-950" : "text-zinc-800"}`}>
+              <span
+                className={`mt-0.5 text-lg font-semibold tabular-nums ${
+                  unavailable ? (blocked ? "text-red-950" : "text-zinc-500") : active ? "text-zinc-950" : "text-zinc-800"
+                }`}
+              >
                 {d.getDate()}
               </span>
-              <span className={`text-[11px] font-medium ${active ? "text-orange-900/90" : "text-zinc-600"}`}>{mon}</span>
+              <span
+                className={`text-[11px] font-medium ${
+                  unavailable
+                    ? blocked
+                      ? "text-red-800/80"
+                      : "text-zinc-400"
+                    : active
+                      ? "text-orange-900/90"
+                      : "text-zinc-600"
+                }`}
+              >
+                {mon}
+              </span>
             </button>
           );
         })}
@@ -220,6 +377,7 @@ export function InterviewSlotPicker({ selectedSlots, onChange }: InterviewSlotPi
         >
           {slotMinutes.map((m) => {
             const past = isSlotInPast(m);
+            const restricted = selectedDayRestricted;
             const selected = slotSelectedOnThisDay(m);
             return (
               <button
@@ -227,7 +385,7 @@ export function InterviewSlotPicker({ selectedSlots, onChange }: InterviewSlotPi
                 type="button"
                 data-slot-min={m}
                 aria-pressed={selected}
-                disabled={past}
+                disabled={past || restricted}
                 onClick={() => toggleSlot(m)}
                 className={`shrink-0 rounded-xl border px-3 py-2.5 text-sm font-semibold tabular-nums transition disabled:cursor-not-allowed disabled:opacity-35 ${
                   selected

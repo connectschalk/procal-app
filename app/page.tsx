@@ -70,6 +70,21 @@ export default function HomePage() {
               I&apos;m Talent
             </Link>
           </div>
+
+          <div className="mt-6 flex flex-col items-center gap-2 text-center">
+            <Link
+              href="/company"
+              className="text-sm text-white/55 underline-offset-4 transition-colors hover:text-white/90 hover:underline"
+            >
+              Already requested talent? Open your company dashboard
+            </Link>
+            <Link
+              href="/consultant"
+              className="text-sm text-white/55 underline-offset-4 transition-colors hover:text-white/90 hover:underline"
+            >
+              Already listed? Open your consultant dashboard
+            </Link>
+          </div>
         </div>
       </main>
     </div>

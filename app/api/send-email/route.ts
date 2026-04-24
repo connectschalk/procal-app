@@ -1,6 +1,5 @@
+import { sendBrevoTransactionalEmail } from "@/lib/send-brevo-transactional";
 import { NextResponse } from "next/server";
-
-const BREVO_URL = "https://api.brevo.com/v3/smtp/email";
 
 type Body = {
   to?: unknown;
@@ -66,35 +65,24 @@ export async function POST(request: Request) {
     }
   }
 
-  const apiKey = process.env.BREVO_API_KEY;
-  if (!apiKey?.trim()) {
-    return NextResponse.json(
-      { success: false, error: "Email service is not configured" },
-      { status: 503 },
-    );
-  }
-
-  const brevoRes = await fetch(BREVO_URL, {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-      "content-type": "application/json",
-      "api-key": apiKey,
-    },
-    body: JSON.stringify({
-      sender: { name: "Procal", email: "info@procal.co.za" },
-      to: [{ email: to.trim() }],
-      subject: subject.trim(),
-      textContent: text,
-      ...(brevoAttachment != null && brevoAttachment.length > 0
-        ? { attachment: brevoAttachment }
-        : {}),
-    }),
+  const send = await sendBrevoTransactionalEmail({
+    to: to.trim(),
+    subject: subject.trim(),
+    text,
+    ...(brevoAttachment != null && brevoAttachment.length > 0 ? { attachments: brevoAttachment } : {}),
   });
 
-  if (!brevoRes.ok) {
+  if (!send.ok) {
+    if (send.error === "Email service is not configured") {
+      return NextResponse.json({ success: false, error: send.error }, { status: 503 });
+    }
     return NextResponse.json(
-      { success: false, error: "Failed to send email" },
+      {
+        success: false,
+        error: send.error,
+        ...(send.details != null ? { details: send.details } : {}),
+        ...(send.status != null ? { status: send.status } : {}),
+      },
       { status: 502 },
     );
   }

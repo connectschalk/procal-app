@@ -56,6 +56,7 @@ export function AdminInterviewsClient({ initialRows }: { initialRows: AdminInter
   async function acceptWithSlot(
     id: string,
     companyName: string,
+    consultantName: string,
     requesterEmail: string,
     selectedSlot: string,
     acceptOption: 1 | 2 | 3,
@@ -73,16 +74,20 @@ export function AdminInterviewsClient({ initialRows }: { initialRows: AdminInter
       return;
     }
     // Best-effort MVP: email the requester; status update already succeeded.
+    const consultantTrimmed = consultantName.trim();
+    const consultantIcsLabel = consultantTrimmed || "Consultant";
+
     const acceptedPreview = interviewAcceptedEmail({
       companyName,
+      consultantName: consultantTrimmed,
       selectedSlot,
     });
 
     let ics: { filename: string; content: string } | null = null;
     try {
       ics = createInterviewIcs({
-        title: `Procal interview — ${companyName}`,
-        description: `Interview request accepted for ${companyName}.`,
+        title: `Procal interview — ${consultantIcsLabel}`,
+        description: `Interview with ${consultantIcsLabel} for ${companyName}.`,
         start: selectedSlot,
         durationMinutes: 30,
         organizerEmail: "info@procal.co.za",
@@ -99,11 +104,11 @@ export function AdminInterviewsClient({ initialRows }: { initialRows: AdminInter
       ...(ics != null ? { attachments: [{ filename: ics.filename, content: ics.content }] } : {}),
     });
     if (!sendResult.ok) {
+      console.error("[admin-interviews] send-email failed (accepted)", sendResult);
       console.log(
         "EMAIL PREVIEW - REQUEST ACCEPTED (send failed, fallback)",
         acceptedPreview.subject,
         acceptedPreview.body,
-        sendResult.error,
       );
       if (ics != null) {
         console.log("ICS PREVIEW - INTERVIEW ACCEPTED (send failed, fallback)", ics.filename, ics.content);
@@ -112,7 +117,12 @@ export function AdminInterviewsClient({ initialRows }: { initialRows: AdminInter
     router.refresh();
   }
 
-  async function declineRequest(id: string, companyName: string, requesterEmail: string) {
+  async function declineRequest(
+    id: string,
+    companyName: string,
+    consultantName: string,
+    requesterEmail: string,
+  ) {
     setActionError(null);
     const key = `${id}:decline`;
     setBusyKey(key);
@@ -122,18 +132,21 @@ export function AdminInterviewsClient({ initialRows }: { initialRows: AdminInter
       setActionError(error.message);
       return;
     }
-    const declinedPreview = interviewDeclinedEmail({ companyName });
+    const declinedPreview = interviewDeclinedEmail({
+      companyName,
+      consultantName: consultantName.trim(),
+    });
     const sendResult = await sendEmailClient({
       to: requesterEmail.trim(),
       subject: declinedPreview.subject,
       text: declinedPreview.body,
     });
     if (!sendResult.ok) {
+      console.error("[admin-interviews] send-email failed (declined)", sendResult);
       console.log(
         "EMAIL PREVIEW - REQUEST DECLINED (send failed, fallback)",
         declinedPreview.subject,
         declinedPreview.body,
-        sendResult.error,
       );
     }
     router.refresh();
@@ -208,6 +221,7 @@ export function AdminInterviewsClient({ initialRows }: { initialRows: AdminInter
                               void acceptWithSlot(
                                 row.id,
                                 row.company_name,
+                                row.consultant_name ?? "",
                                 row.requester_email,
                                 row.proposed_slot_1 as string,
                                 1,
@@ -226,6 +240,7 @@ export function AdminInterviewsClient({ initialRows }: { initialRows: AdminInter
                               void acceptWithSlot(
                                 row.id,
                                 row.company_name,
+                                row.consultant_name ?? "",
                                 row.requester_email,
                                 row.proposed_slot_2 as string,
                                 2,
@@ -244,6 +259,7 @@ export function AdminInterviewsClient({ initialRows }: { initialRows: AdminInter
                               void acceptWithSlot(
                                 row.id,
                                 row.company_name,
+                                row.consultant_name ?? "",
                                 row.requester_email,
                                 row.proposed_slot_3 as string,
                                 3,
@@ -257,7 +273,14 @@ export function AdminInterviewsClient({ initialRows }: { initialRows: AdminInter
                         <button
                           type="button"
                           disabled={rowBusy}
-                          onClick={() => void declineRequest(row.id, row.company_name, row.requester_email)}
+                          onClick={() =>
+                            void declineRequest(
+                              row.id,
+                              row.company_name,
+                              row.consultant_name ?? "",
+                              row.requester_email,
+                            )
+                          }
                           className="rounded-full border border-red-200 bg-white px-4 py-2 text-xs font-semibold text-red-900 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           {busyKey === `${row.id}:decline` ? "…" : "Decline"}

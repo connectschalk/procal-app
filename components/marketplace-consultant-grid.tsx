@@ -8,6 +8,10 @@ export type MarketplaceResource = {
   hourly_rate: number | null;
   years_experience: number | null;
   bio: string | null;
+  /** ISO date YYYY-MM-DD or null when unset */
+  available_from: string | null;
+  /** Earliest blocked_date >= today for this resource, if any */
+  next_blocked_date: string | null;
 };
 
 function formatRate(rate: number | null) {
@@ -18,7 +22,22 @@ function formatRate(rate: number | null) {
   }).format(rate)} / hr`;
 }
 
-export function MarketplaceConsultantGrid({ resources }: { resources: MarketplaceResource[] }) {
+function formatCardDate(iso: string): string {
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat("en-ZA", { dateStyle: "medium" }).format(d);
+}
+
+export function MarketplaceConsultantGrid({
+  resources,
+  activeAvailabilityDate = "",
+}: {
+  resources: MarketplaceResource[];
+  /** YYYY-MM-DD when the marketplace date filter is set */
+  activeAvailabilityDate?: string;
+}) {
+  const filterIso = activeAvailabilityDate.trim();
+
   return (
     <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {resources.map((resource) => (
@@ -28,6 +47,20 @@ export function MarketplaceConsultantGrid({ resources }: { resources: Marketplac
         >
           <div className="space-y-1">
             <h2 className="text-lg font-semibold tracking-tight text-zinc-900">{resource.name}</h2>
+            <div className="space-y-0.5 text-xs text-zinc-500">
+              {filterIso !== "" ? (
+                <p>Available on {formatCardDate(filterIso)}</p>
+              ) : resource.available_from != null && resource.available_from.trim() !== "" ? (
+                <p>Available from {formatCardDate(resource.available_from)}</p>
+              ) : (
+                <p>Available now</p>
+              )}
+              {resource.next_blocked_date != null &&
+              resource.next_blocked_date.trim() !== "" &&
+              (filterIso === "" || resource.next_blocked_date > filterIso) ? (
+                <p>Next unavailable: {formatCardDate(resource.next_blocked_date)}</p>
+              ) : null}
+            </div>
             <p className="text-sm text-zinc-600">{resource.headline ?? "Consultant"}</p>
           </div>
 

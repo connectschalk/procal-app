@@ -1,16 +1,15 @@
 "use client";
 
-import { InterviewSlotPicker, slotsToProposedColumns } from "@/components/interview-slot-picker";
 import {
-  interviewRequestNotifyConsultantEmail,
-  interviewRequestSubmittedEmail,
+  engagementProposalNotifyConsultantEmail,
+  engagementProposalSubmittedEmail,
 } from "@/lib/email-placeholders";
 import { sendEmailClient } from "@/lib/send-email-client";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
-export function InterviewRequestForm({
+export function EngagementProposalForm({
   resourceId,
   consultantName,
 }: {
@@ -20,39 +19,43 @@ export function InterviewRequestForm({
   const [companyName, setCompanyName] = useState("");
   const [requesterName, setRequesterName] = useState("");
   const [requesterEmail, setRequesterEmail] = useState("");
-  const [message, setMessage] = useState("");
-  const [pickedSlots, setPickedSlots] = useState<string[]>([]);
+  const [proposedStartDate, setProposedStartDate] = useState("");
+  const [proposedEndDate, setProposedEndDate] = useState("");
+  const [scope, setScope] = useState("");
+  const [proposedRate, setProposedRate] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [slotsError, setSlotsError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
-    setSlotsError(null);
     setSuccess(false);
     setSubmitting(true);
 
-    if (pickedSlots.length === 0) {
-      setSlotsError("Select at least one interview time.");
-      setSubmitting(false);
-      return;
+    const rateTrim = proposedRate.trim();
+    let proposed_rate: number | null = null;
+    if (rateTrim !== "") {
+      const n = Number(rateTrim);
+      if (!Number.isFinite(n) || n < 0) {
+        setError("Proposed rate must be a valid non-negative number.");
+        setSubmitting(false);
+        return;
+      }
+      proposed_rate = n;
     }
 
-    const { proposed_slot_1, proposed_slot_2, proposed_slot_3 } = slotsToProposedColumns(pickedSlots);
-
-    const { error: insertError } = await supabase.from("interview_requests").insert([
+    const { error: insertError } = await supabase.from("engagement_proposals").insert([
       {
         resource_id: resourceId,
-        company_name: companyName,
-        requester_name: requesterName,
-        requester_email: requesterEmail,
-        message: message.trim() || null,
-        proposed_slot_1,
-        proposed_slot_2,
-        proposed_slot_3,
-        status: "requested",
+        company_name: companyName.trim(),
+        requester_name: requesterName.trim(),
+        requester_email: requesterEmail.trim(),
+        proposed_start_date: proposedStartDate.trim() || null,
+        proposed_end_date: proposedEndDate.trim() || null,
+        scope: scope.trim() || null,
+        proposed_rate,
+        status: "proposed",
       },
     ]);
 
@@ -73,10 +76,9 @@ export function InterviewRequestForm({
     const consultantNameForEmail =
       resourceNameRaw?.trim() || consultantName.trim() || "";
 
-    // Best-effort MVP: notify requester by email; DB insert already succeeded.
     const companyForEmail = companyName.trim() || "there";
     const requesterTo = requesterEmail.trim();
-    const submittedPreview = interviewRequestSubmittedEmail({
+    const submittedPreview = engagementProposalSubmittedEmail({
       companyName: companyForEmail,
       consultantName: consultantNameForEmail,
     });
@@ -86,25 +88,22 @@ export function InterviewRequestForm({
       text: submittedPreview.body,
     });
     if (!sendResult.ok) {
-      console.error("[interview-request-form] send-email failed", sendResult);
+      console.error("[engagement-proposal-form] send-email failed", sendResult);
       console.log(
-        "EMAIL PREVIEW - REQUEST SUBMITTED (send failed, fallback)",
+        "EMAIL PREVIEW - ENGAGEMENT PROPOSAL SUBMITTED (send failed, fallback)",
         submittedPreview.subject,
         submittedPreview.body,
       );
     }
 
-    // Best-effort MVP: notify consultant if resources.contact_email is set (not shown publicly).
     const consultantTo = (resourceContact?.contact_email as string | null | undefined)?.trim();
     if (consultantTo) {
-      const consultantPreview = interviewRequestNotifyConsultantEmail({
+      const consultantPreview = engagementProposalNotifyConsultantEmail({
         consultantName: consultantNameForEmail,
         companyName: companyForEmail,
         requesterName: requesterName.trim(),
-        message: message.trim() || null,
-        proposed_slot_1,
-        proposed_slot_2,
-        proposed_slot_3,
+        scope: scope.trim() || null,
+        proposedRate: proposed_rate,
       });
       const consultantSend = await sendEmailClient({
         to: consultantTo,
@@ -112,33 +111,35 @@ export function InterviewRequestForm({
         text: consultantPreview.body,
       });
       if (!consultantSend.ok) {
-        console.error("[interview-request-form] consultant send-email failed", consultantSend);
+        console.error("[engagement-proposal-form] consultant send-email failed", consultantSend);
+        console.log(
+          "EMAIL PREVIEW - ENGAGEMENT NOTIFY CONSULTANT (send failed, fallback)",
+          consultantPreview.subject,
+          consultantPreview.body,
+        );
       }
     } else {
-      console.warn("[interview-request-form] No consultant contact_email for resource; skipping notify", resourceId);
+      console.warn(
+        "[engagement-proposal-form] No consultant contact_email for resource; skipping notify",
+        resourceId,
+      );
     }
 
     setSuccess(true);
     setCompanyName("");
     setRequesterName("");
     setRequesterEmail("");
-    setMessage("");
-    setPickedSlots([]);
+    setProposedStartDate("");
+    setProposedEndDate("");
+    setScope("");
+    setProposedRate("");
   }
 
   if (success) {
     return (
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-6 md:p-8">
-        <p className="text-base font-medium text-emerald-950">
-          Interview request submitted. The consultant will review your proposed slots.
-        </p>
+        <p className="text-base font-medium text-emerald-950">Engagement proposal submitted.</p>
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            href="/company"
-            className="inline-flex items-center justify-center rounded-full border border-orange-300 bg-orange-50 px-5 py-2.5 text-sm font-semibold text-orange-950 hover:bg-orange-100"
-          >
-            Track my request
-          </Link>
           <Link
             href={`/consultants/${resourceId}`}
             className="inline-flex items-center justify-center rounded-full border border-emerald-300 bg-white px-5 py-2.5 text-sm font-medium text-emerald-900 hover:bg-emerald-50"
@@ -152,9 +153,6 @@ export function InterviewRequestForm({
             Marketplace
           </Link>
         </div>
-        <p className="mt-4 text-sm leading-relaxed text-emerald-900/70">
-          Use the same email address you submitted with to open your company dashboard.
-        </p>
       </div>
     );
   }
@@ -162,7 +160,8 @@ export function InterviewRequestForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <p className="text-sm text-zinc-600">
-        Requesting interview with <span className="font-medium text-zinc-900">{consultantName}</span>
+        Proposing engagement with{" "}
+        <span className="font-medium text-zinc-900">{consultantName}</span>
       </p>
 
       <label className="flex flex-col gap-1.5 text-sm">
@@ -198,39 +197,49 @@ export function InterviewRequestForm({
         />
       </label>
 
+      <div className="grid gap-6 sm:grid-cols-2">
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="font-medium text-zinc-800">Proposed start date</span>
+          <input
+            type="date"
+            value={proposedStartDate}
+            onChange={(e) => setProposedStartDate(e.target.value)}
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none ring-zinc-950 focus:ring-2"
+          />
+        </label>
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="font-medium text-zinc-800">Proposed end date</span>
+          <input
+            type="date"
+            value={proposedEndDate}
+            onChange={(e) => setProposedEndDate(e.target.value)}
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none ring-zinc-950 focus:ring-2"
+          />
+        </label>
+      </div>
+
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-zinc-800">Message</span>
+        <span className="font-medium text-zinc-800">Scope</span>
         <textarea
           rows={4}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Context for the interview, role, or timeline"
+          value={scope}
+          onChange={(e) => setScope(e.target.value)}
+          placeholder="Deliverables, duration expectations, or context"
           className="resize-y rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none ring-zinc-950 placeholder:text-zinc-400 focus:ring-2"
         />
       </label>
 
-      <div className="rounded-2xl border border-zinc-200/90 bg-zinc-50/50 p-5 shadow-sm shadow-zinc-950/[0.03] md:p-6">
-        <div className="space-y-1.5">
-          <h2 className="text-sm font-semibold tracking-tight text-zinc-950">Choose interview times</h2>
-          <p className="text-xs leading-relaxed text-zinc-600">
-            Pick a date, then tap up to three 30-minute slots. Times use your device timezone.
-          </p>
-          <p className="text-xs leading-relaxed text-zinc-700">
-            This consultant may have limited availability. Select suitable dates where possible.
-          </p>
-        </div>
-        <div className="mt-5">
-          <InterviewSlotPicker
-            resourceId={resourceId}
-            selectedSlots={pickedSlots}
-            onChange={(next) => {
-              setPickedSlots(next);
-              setSlotsError(null);
-            }}
-          />
-        </div>
-        {slotsError ? <p className="mt-3 text-sm text-red-600">{slotsError}</p> : null}
-      </div>
+      <label className="flex flex-col gap-1.5 text-sm">
+        <span className="font-medium text-zinc-800">Proposed rate (optional)</span>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={proposedRate}
+          onChange={(e) => setProposedRate(e.target.value)}
+          placeholder="e.g. 1500 (ZAR per hour or as agreed)"
+          className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none ring-zinc-950 placeholder:text-zinc-400 focus:ring-2"
+        />
+      </label>
 
       {error ? (
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
@@ -242,7 +251,7 @@ export function InterviewRequestForm({
           disabled={submitting}
           className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-zinc-950 px-6 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 disabled:opacity-60"
         >
-          {submitting ? "Submitting…" : "Submit request"}
+          {submitting ? "Submitting…" : "Submit proposal"}
         </button>
         <Link
           href={`/consultants/${resourceId}`}

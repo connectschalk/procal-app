@@ -16,11 +16,49 @@ function matchesSearch(resource: MarketplaceResource, query: string) {
   return haystack.includes(q);
 }
 
-export function MarketplaceWithFilters({ resources }: { resources: MarketplaceResource[] }) {
+function buildBlockedByResource(rows: { resource_id: string; blocked_date: string }[]) {
+  const map = new Map<string, Set<string>>();
+  for (const row of rows) {
+    let set = map.get(row.resource_id);
+    if (set == null) {
+      set = new Set<string>();
+      map.set(row.resource_id, set);
+    }
+    set.add(row.blocked_date);
+  }
+  return map;
+}
+
+function passesAvailableByDate(
+  resource: MarketplaceResource,
+  selectedIso: string,
+  blockedByResource: Map<string, Set<string>>,
+): boolean {
+  const af = resource.available_from;
+  if (af != null && af.trim() !== "" && af > selectedIso) {
+    return false;
+  }
+  const blocked = blockedByResource.get(resource.id);
+  if (blocked != null && blocked.has(selectedIso)) {
+    return false;
+  }
+  return true;
+}
+
+export function MarketplaceWithFilters({
+  resources,
+  blockedDateRows,
+}: {
+  resources: MarketplaceResource[];
+  blockedDateRows: { resource_id: string; blocked_date: string }[];
+}) {
   const [search, setSearch] = useState("");
   const [location, setLocation] = useState("");
   const [minYears, setMinYears] = useState("");
   const [maxRate, setMaxRate] = useState("");
+  const [availableByDate, setAvailableByDate] = useState("");
+
+  const blockedByResource = useMemo(() => buildBlockedByResource(blockedDateRows), [blockedDateRows]);
 
   const locationOptions = useMemo(() => {
     const set = new Set<string>();
@@ -34,6 +72,7 @@ export function MarketplaceWithFilters({ resources }: { resources: MarketplaceRe
   const filtered = useMemo(() => {
     const minY = minYears.trim() === "" ? null : Number.parseInt(minYears, 10);
     const maxR = maxRate.trim() === "" ? null : Number(maxRate);
+    const dateFilter = availableByDate.trim();
 
     return resources.filter((r) => {
       if (!matchesSearch(r, search)) return false;
@@ -51,9 +90,13 @@ export function MarketplaceWithFilters({ resources }: { resources: MarketplaceRe
         if (r.hourly_rate != null && r.hourly_rate > maxR) return false;
       }
 
+      if (dateFilter !== "") {
+        if (!passesAvailableByDate(r, dateFilter, blockedByResource)) return false;
+      }
+
       return true;
     });
-  }, [resources, search, location, minYears, maxRate]);
+  }, [resources, search, location, minYears, maxRate, availableByDate, blockedByResource]);
 
   const countWord = (n: number) => (n === 1 ? "consultant" : "consultants");
   const countLabel =
@@ -118,6 +161,16 @@ export function MarketplaceWithFilters({ resources }: { resources: MarketplaceRe
               className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none ring-zinc-950 placeholder:text-zinc-400 focus:ring-2"
             />
           </label>
+
+          <label className="flex flex-col gap-1.5 text-sm md:col-span-2 lg:col-span-2">
+            <span className="font-medium text-zinc-700">Available by date</span>
+            <input
+              type="date"
+              value={availableByDate}
+              onChange={(e) => setAvailableByDate(e.target.value)}
+              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none ring-zinc-950 focus:ring-2"
+            />
+          </label>
         </div>
       </div>
 
@@ -126,7 +179,10 @@ export function MarketplaceWithFilters({ resources }: { resources: MarketplaceRe
           No consultants match your filters.
         </p>
       ) : (
-        <MarketplaceConsultantGrid resources={filtered} />
+        <MarketplaceConsultantGrid
+          resources={filtered}
+          activeAvailabilityDate={availableByDate.trim()}
+        />
       )}
     </div>
   );

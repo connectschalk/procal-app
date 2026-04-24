@@ -12,6 +12,7 @@ export default function CreateConsultantPage() {
   const [hourlyRate, setHourlyRate] = useState("");
   const [yearsExperience, setYearsExperience] = useState("");
   const [bio, setBio] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -29,6 +30,13 @@ export default function CreateConsultantPage() {
       return;
     }
 
+    const contactTrimmed = contactEmail.trim();
+    if (!contactTrimmed) {
+      setError("Notification email is required.");
+      setSubmitting(false);
+      return;
+    }
+
     const hourly_rate = Number(hourlyRate);
     const years_experience = Number.parseInt(yearsExperience, 10);
 
@@ -40,6 +48,7 @@ export default function CreateConsultantPage() {
         hourly_rate,
         years_experience,
         bio,
+        contact_email: contactTrimmed,
         profile_status: "draft",
       },
     ]);
@@ -58,6 +67,7 @@ export default function CreateConsultantPage() {
     setHourlyRate("");
     setYearsExperience("");
     setBio("");
+    setContactEmail("");
   }
 
   return (
@@ -105,6 +115,21 @@ export default function CreateConsultantPage() {
               onChange={(e) => setName(e.target.value)}
               className="rounded-lg border border-zinc-200 px-3 py-2 text-zinc-900 outline-none ring-zinc-950 focus:ring-2"
             />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-medium text-zinc-800">Notification email</span>
+            <input
+              required
+              type="email"
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+              autoComplete="email"
+              className="rounded-lg border border-zinc-200 px-3 py-2 text-zinc-900 outline-none ring-zinc-950 focus:ring-2"
+            />
+            <span className="text-xs text-zinc-500">
+              Used only to email you about new interview requests. Not shown on your public profile.
+            </span>
           </label>
 
           <label className="flex flex-col gap-2 text-sm">

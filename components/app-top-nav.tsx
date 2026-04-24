@@ -18,8 +18,10 @@ export function AppTopNav() {
   const createActive = pathname === "/create";
   const myRequestsActive = pathname === "/requests";
   const companyDashboardActive = pathname === "/company";
+  const consultantDashboardActive = pathname === "/consultant" || pathname.startsWith("/consultant/");
   const adminResourcesActive = pathname.startsWith("/admin/resources");
   const adminInterviewsActive = pathname.startsWith("/admin/interviews");
+  const adminEngagementsActive = pathname.startsWith("/admin/engagements");
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white">
@@ -37,6 +39,9 @@ export function AppTopNav() {
           <Link href="/company" className={navLinkClass(companyDashboardActive)}>
             Company Dashboard
           </Link>
+          <Link href="/consultant" className={navLinkClass(consultantDashboardActive)}>
+            Consultant Dashboard
+          </Link>
           <Link href="/requests" className={navLinkClass(myRequestsActive)}>
             My Requests
           </Link>
@@ -48,6 +53,9 @@ export function AppTopNav() {
           </Link>
           <Link href="/admin/interviews" className={navLinkClass(adminInterviewsActive)}>
             Interviews
+          </Link>
+          <Link href="/admin/engagements" className={navLinkClass(adminEngagementsActive)}>
+            Engagements
           </Link>
         </div>
       </nav>

@@ -5,11 +5,20 @@ export async function sendEmailClient(params: {
   to: string;
   subject: string;
   text: string;
+  /** Plain-text file bodies; server base64-encodes for Brevo `attachment`. */
+  attachments?: Array<{ filename: string; content: string }>;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const res = await fetch("/api/send-email", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
+    body: JSON.stringify({
+      to: params.to,
+      subject: params.subject,
+      text: params.text,
+      ...(params.attachments != null && params.attachments.length > 0
+        ? { attachments: params.attachments }
+        : {}),
+    }),
   });
 
   let data: { success?: boolean; error?: string } = {};

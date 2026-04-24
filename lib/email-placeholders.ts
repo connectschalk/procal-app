@@ -58,7 +58,7 @@ export function interviewAcceptedEmail(
     "",
     "Your interview request has been accepted.",
     "",
-    `Confirmed time: ${when}`,
+    `Calendar invite support is being prepared. Confirmed time: ${when}.`,
     "",
     "— Procal",
   ].join("\n");

@@ -1,5 +1,6 @@
 "use client";
 
+import { createInterviewIcs } from "@/lib/calendar-invite";
 import { interviewAcceptedEmail, interviewDeclinedEmail } from "@/lib/email-placeholders";
 import { sendEmailClient } from "@/lib/send-email-client";
 import { supabase } from "@/lib/supabase";
@@ -76,10 +77,26 @@ export function AdminInterviewsClient({ initialRows }: { initialRows: AdminInter
       companyName,
       selectedSlot,
     });
+
+    let ics: { filename: string; content: string } | null = null;
+    try {
+      ics = createInterviewIcs({
+        title: `Procal interview — ${companyName}`,
+        description: `Interview request accepted for ${companyName}.`,
+        start: selectedSlot,
+        durationMinutes: 30,
+        organizerEmail: "info@procal.co.za",
+        attendeeEmail: requesterEmail.trim(),
+      });
+    } catch {
+      /* invalid slot — DB already updated; email sends without .ics */
+    }
+
     const sendResult = await sendEmailClient({
       to: requesterEmail.trim(),
       subject: acceptedPreview.subject,
       text: acceptedPreview.body,
+      ...(ics != null ? { attachments: [{ filename: ics.filename, content: ics.content }] } : {}),
     });
     if (!sendResult.ok) {
       console.log(
@@ -88,6 +105,9 @@ export function AdminInterviewsClient({ initialRows }: { initialRows: AdminInter
         acceptedPreview.body,
         sendResult.error,
       );
+      if (ics != null) {
+        console.log("ICS PREVIEW - INTERVIEW ACCEPTED (send failed, fallback)", ics.filename, ics.content);
+      }
     }
     router.refresh();
   }

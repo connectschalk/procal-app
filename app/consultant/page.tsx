@@ -128,7 +128,7 @@ function kindTabClass(active: boolean) {
 }
 
 function profileLabel(name: string | null) {
-  return name != null && name.trim() !== "" ? name.trim() : "Your profile";
+  return name != null && name.trim() !== "" ? name.trim() : "Your talent profile";
 }
 
 function summarizeInterviews(rows: InterviewRequestRow[]) {
@@ -426,9 +426,9 @@ export default function ConsultantDashboardPage() {
         <header className="space-y-2">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2">
-              <h1 className="text-2xl font-semibold tracking-tight text-zinc-950 md:text-3xl">Consultant Dashboard</h1>
+              <h1 className="text-2xl font-semibold tracking-tight text-zinc-950 md:text-3xl">Talent Dashboard</h1>
               <p className="text-sm leading-relaxed text-zinc-600">
-                Enter your email to view interview requests and engagement proposals tied to your Procal profile.
+                Enter your email to view interview requests and engagement proposals tied to your Procal talent profile.
               </p>
             </div>
             {dashboardEmail != null ? (
@@ -509,7 +509,7 @@ export default function ConsultantDashboardPage() {
 
         {hasLoaded && noProfileForEmail ? (
           <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
-            No consultant profile found for this email.
+            No talent profile found for this email.
           </p>
         ) : null}
 
@@ -607,7 +607,7 @@ export default function ConsultantDashboardPage() {
                           className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/5 md:p-6"
                         >
                           <p className="text-xs text-zinc-500">
-                            <span className="font-medium text-zinc-600">Profile:</span>{" "}
+                            <span className="font-medium text-zinc-600">Talent:</span>{" "}
                             {profileLabel(row.consultant_name)}
                           </p>
                           <ConsultantAvailabilityContext
@@ -694,7 +694,7 @@ export default function ConsultantDashboardPage() {
                         className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/5 md:p-6"
                       >
                         <p className="text-xs text-zinc-500">
-                          <span className="font-medium text-zinc-600">Profile:</span>{" "}
+                          <span className="font-medium text-zinc-600">Talent:</span>{" "}
                           {profileLabel(row.consultant_name)}
                         </p>
                         <ConsultantAvailabilityContext

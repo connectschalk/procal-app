@@ -1,10 +1,15 @@
 import { AdminResourcesClient, type AdminResourceRow } from "@/components/admin-resources-client";
 import { AppTopNav } from "@/components/app-top-nav";
+import { requireAdmin } from "@/lib/require-role";
 import { supabase } from "@/lib/supabase";
+
+export const dynamic = "force-dynamic";
 
 type RowWithCreated = AdminResourceRow & { created_at: string | null };
 
 export default async function AdminResourcesPage() {
+  await requireAdmin();
+
   const { data, error } = await supabase
     .from("resources")
     .select("id, name, headline, location, profile_status, created_at")

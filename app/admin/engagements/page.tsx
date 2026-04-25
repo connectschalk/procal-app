@@ -3,11 +3,14 @@ import {
   type AdminEngagementProposalRow,
 } from "@/components/admin-engagements-client";
 import { AppTopNav } from "@/components/app-top-nav";
+import { requireAdmin } from "@/lib/require-role";
 import { supabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminEngagementsPage() {
+  await requireAdmin();
+
   const { data, error } = await supabase
     .from("engagement_proposals")
     .select(

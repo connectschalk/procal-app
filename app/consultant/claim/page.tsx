@@ -69,7 +69,7 @@ export default function ConsultantClaimPage() {
         <header className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">Claim your profile</h1>
           <p className="text-sm leading-relaxed text-zinc-600">
-            Verify the email on your consultant profile. We&apos;ll send a one-time code to complete the claim.
+            Verify the email on your talent profile. We&apos;ll send a one-time code to complete the claim.
           </p>
         </header>
 
@@ -160,7 +160,7 @@ export default function ConsultantClaimPage() {
                 href="/consultant"
                 className="inline-flex items-center justify-center rounded-full bg-emerald-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"
               >
-                Open consultant dashboard
+                Open talent dashboard
               </Link>
               <Link
                 href="/marketplace"
@@ -174,7 +174,7 @@ export default function ConsultantClaimPage() {
 
         <p className="text-center text-xs text-zinc-500">
           <Link href="/consultant" className="font-medium text-orange-700 underline-offset-2 hover:underline">
-            ← Back to consultant dashboard
+            ← Talent Dashboard
           </Link>
         </p>
       </main>

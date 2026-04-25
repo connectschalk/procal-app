@@ -237,7 +237,7 @@ export default function ConsultantEditProfilePage() {
 
         {noProfile ? (
           <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
-            No consultant profile found for this email.
+            No talent profile found for this email.
           </p>
         ) : null}
 
@@ -360,7 +360,7 @@ export default function ConsultantEditProfilePage() {
 
         <p className="text-center text-xs text-zinc-500">
           <Link href="/consultant" className="font-medium text-orange-700 underline-offset-2 hover:underline">
-            ← Consultant dashboard
+            ← Talent Dashboard
           </Link>
         </p>
       </main>

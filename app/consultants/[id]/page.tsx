@@ -1,4 +1,5 @@
 import { AppTopNav } from "@/components/app-top-nav";
+import { PublicAvailabilityCalendar } from "@/components/public-availability-calendar";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -13,19 +14,6 @@ function formatHourlyRateZar(rate: number | null) {
     style: "currency",
     currency: "ZAR",
   }).format(rate)} / hr`;
-}
-
-function formatDate(isoDate: string): string {
-  const d = new Date(`${isoDate}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return isoDate;
-  return new Intl.DateTimeFormat("en-ZA", { dateStyle: "medium" }).format(d);
-}
-
-function localIsoDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
 }
 
 export default async function ConsultantProfilePage({ params }: PageProps) {
@@ -54,24 +42,24 @@ export default async function ConsultantProfilePage({ params }: PageProps) {
       ? String(availableFromRaw).slice(0, 10)
       : null;
 
-  const today = localIsoDate(new Date());
-
   const { data: blockedRows, error: blockedError } = await supabase
     .from("resource_blocked_dates")
     .select("blocked_date, reason")
     .eq("resource_id", id)
-    .gte("blocked_date", today)
     .order("blocked_date", { ascending: true });
 
-  const upcomingBlocked =
-    !blockedError && blockedRows != null && blockedRows.length > 0
-      ? (blockedRows as { blocked_date: string; reason: string | null }[])
+  const blockedForCalendar =
+    !blockedError && blockedRows != null
+      ? (blockedRows as { blocked_date: string; reason: string | null }[]).map((r) => ({
+          blocked_date: String(r.blocked_date).slice(0, 10),
+          reason: r.reason,
+        }))
       : [];
 
   return (
     <>
       <AppTopNav />
-      <main className="mx-auto min-h-screen w-full max-w-3xl bg-white px-6 py-10 md:px-10 md:py-16">
+      <main className="mx-auto min-h-screen w-full max-w-4xl bg-white px-6 py-10 md:px-10 md:py-16">
       <Link
         href="/marketplace"
         className="text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-900"
@@ -109,33 +97,8 @@ export default async function ConsultantProfilePage({ params }: PageProps) {
         <p className="mt-3 text-base leading-relaxed text-zinc-700">{bio ?? "No bio provided."}</p>
       </section>
 
-      <section className="mt-12 rounded-2xl border border-zinc-200 bg-zinc-50/40 p-6 md:p-8">
-        <h2 className="text-sm font-semibold text-zinc-900">Availability</h2>
-        <div className="mt-4 space-y-4">
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Available from</h3>
-            <p className="mt-1.5 text-sm text-zinc-800">
-              {availableFrom != null ? formatDate(availableFrom) : "Not specified"}
-            </p>
-          </div>
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Blocked dates</h3>
-            {upcomingBlocked.length === 0 ? (
-              <p className="mt-1.5 text-sm text-zinc-600">No blocked days published.</p>
-            ) : (
-              <ul className="mt-2 space-y-2">
-                {upcomingBlocked.map((row, i) => (
-                  <li key={`${row.blocked_date}-${i}`} className="text-sm text-zinc-800">
-                    <span className="font-medium">{formatDate(row.blocked_date)}</span>
-                    {row.reason?.trim() ? (
-                      <span className="text-zinc-600"> — {row.reason.trim()}</span>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
+      <section className="mt-12">
+        <PublicAvailabilityCalendar availableFrom={availableFrom} blockedDates={blockedForCalendar} />
       </section>
 
       <section className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50/40 p-6 md:p-8">

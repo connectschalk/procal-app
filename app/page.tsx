@@ -56,18 +56,24 @@ export default function HomePage() {
             Discover trusted consultants and specialists.
           </p>
 
-          <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="mt-10 grid w-full max-w-md grid-cols-1 gap-6 self-center sm:max-w-none sm:grid-cols-2">
             <Link
               href="/marketplace"
-              className="flex min-h-[3.25rem] items-center justify-center rounded-2xl bg-orange-500 px-6 py-4 text-center text-base font-semibold text-white shadow-lg shadow-orange-900/30 transition hover:bg-orange-600 hover:shadow-xl"
+              className="group flex cursor-pointer flex-col items-center gap-1 rounded-2xl border border-orange-400/35 bg-orange-600/90 px-6 py-5 text-center shadow-md shadow-orange-950/20 transition duration-200 ease-out hover:scale-[1.02] hover:border-orange-300/50 hover:bg-orange-500/95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950/80"
             >
-              I&apos;m a Company
+              <span className="text-xl font-semibold tracking-tight text-white">Companies</span>
+              <span className="text-sm text-white/80 transition-colors duration-200 group-hover:text-white">
+                Find the right talent
+              </span>
             </Link>
             <Link
               href="/create"
-              className="flex min-h-[3.25rem] items-center justify-center rounded-2xl border border-white/10 bg-slate-900 px-6 py-4 text-center text-base font-semibold text-white shadow-lg shadow-black/30 transition hover:bg-slate-800"
+              className="group flex cursor-pointer flex-col items-center gap-1 rounded-2xl border border-white/12 bg-slate-900/90 px-6 py-5 text-center shadow-md shadow-black/25 transition duration-200 ease-out hover:scale-[1.02] hover:border-white/20 hover:bg-slate-800/95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950/80"
             >
-              I&apos;m Talent
+              <span className="text-xl font-semibold tracking-tight text-white">Talent</span>
+              <span className="text-sm text-white/60 transition-colors duration-200 group-hover:text-white/75">
+                List your services
+              </span>
             </Link>
           </div>
 
@@ -82,7 +88,7 @@ export default function HomePage() {
               href="/consultant"
               className="text-sm text-white/55 underline-offset-4 transition-colors hover:text-white/90 hover:underline"
             >
-              Already listed? Open your consultant dashboard
+              Already listed? Open your talent dashboard
             </Link>
           </div>
         </div>

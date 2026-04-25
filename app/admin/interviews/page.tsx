@@ -3,11 +3,14 @@ import {
   type AdminInterviewRequestRow,
 } from "@/components/admin-interviews-client";
 import { AppTopNav } from "@/components/app-top-nav";
+import { requireAdmin } from "@/lib/require-role";
 import { supabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminInterviewsPage() {
+  await requireAdmin();
+
   const { data, error } = await supabase
     .from("interview_requests")
     .select(

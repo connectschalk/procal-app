@@ -14,6 +14,8 @@ export type MarketplaceResource = {
   next_blocked_date: string | null;
 };
 
+const ACCENT = "#ff6a00";
+
 function formatRate(rate: number | null) {
   if (rate == null) return "Rate on request";
   return `${new Intl.NumberFormat("en-ZA", {
@@ -38,44 +40,62 @@ export function MarketplaceConsultantGrid({
 }) {
   const filterIso = activeAvailabilityDate.trim();
 
+  const cardClass =
+    "group flex h-full flex-col rounded-3xl border border-white/10 bg-black/30 p-6 shadow-lg shadow-black/25 backdrop-blur-md transition duration-300 ease-out hover:-translate-y-0.5 hover:border-white/[0.14] hover:bg-black/40 hover:shadow-xl hover:shadow-orange-950/20";
+
   return (
-    <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
       {resources.map((resource) => (
-        <article
-          key={resource.id}
-          className="flex h-full flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-6"
-        >
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold tracking-tight text-zinc-900">{resource.name}</h2>
-            <div className="space-y-0.5 text-xs text-zinc-500">
+        <article key={resource.id} className={cardClass}>
+          <div className="space-y-2">
+            <h2 className="text-lg font-semibold tracking-tight text-white">{resource.name}</h2>
+            <div className="space-y-1 text-xs leading-snug">
               {filterIso !== "" ? (
-                <p>Available on {formatCardDate(filterIso)}</p>
+                <p>
+                  <span className="text-zinc-500">Availability</span>{" "}
+                  <span className="font-medium" style={{ color: ACCENT }}>
+                    Available on {formatCardDate(filterIso)}
+                  </span>
+                </p>
               ) : resource.available_from != null && resource.available_from.trim() !== "" ? (
-                <p>Available from {formatCardDate(resource.available_from)}</p>
+                <p>
+                  <span className="text-zinc-500">Availability</span>{" "}
+                  <span className="font-medium text-zinc-200">
+                    From {formatCardDate(resource.available_from)}
+                  </span>
+                </p>
               ) : (
-                <p>Available now</p>
+                <p>
+                  <span className="text-zinc-500">Availability</span>{" "}
+                  <span className="font-medium" style={{ color: ACCENT }}>
+                    Available now
+                  </span>
+                </p>
               )}
               {resource.next_blocked_date != null &&
               resource.next_blocked_date.trim() !== "" &&
               (filterIso === "" || resource.next_blocked_date > filterIso) ? (
-                <p>Next unavailable: {formatCardDate(resource.next_blocked_date)}</p>
+                <p className="text-zinc-500">
+                  Next unavailable:{" "}
+                  <span className="text-zinc-400">{formatCardDate(resource.next_blocked_date)}</span>
+                </p>
               ) : null}
             </div>
-            <p className="text-sm text-zinc-600">{resource.headline ?? "Consultant"}</p>
+            <p className="text-sm text-zinc-300">{resource.headline ?? "Consultant"}</p>
           </div>
 
-          <dl className="grid grid-cols-2 gap-3 text-sm">
+          <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-white/[0.06] pt-4 text-sm">
             <div>
-              <dt className="text-zinc-500">Location</dt>
-              <dd className="font-medium text-zinc-800">{resource.location ?? "Remote"}</dd>
+              <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Location</dt>
+              <dd className="mt-0.5 font-medium text-zinc-100">{resource.location ?? "Remote"}</dd>
             </div>
             <div>
-              <dt className="text-zinc-500">Rate</dt>
-              <dd className="font-medium text-zinc-800">{formatRate(resource.hourly_rate)}</dd>
+              <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Rate</dt>
+              <dd className="mt-0.5 font-medium text-zinc-100">{formatRate(resource.hourly_rate)}</dd>
             </div>
             <div className="col-span-2">
-              <dt className="text-zinc-500">Experience</dt>
-              <dd className="font-medium text-zinc-800">
+              <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Experience</dt>
+              <dd className="mt-0.5 font-medium text-zinc-100">
                 {resource.years_experience != null
                   ? `${resource.years_experience} years`
                   : "Experience not listed"}
@@ -83,12 +103,15 @@ export function MarketplaceConsultantGrid({
             </div>
           </dl>
 
-          <p className="text-sm leading-6 text-zinc-700">{resource.bio ?? "No bio provided."}</p>
+          <p className="mt-3 flex-1 text-sm leading-relaxed text-zinc-400">
+            {resource.bio ?? "No bio provided."}
+          </p>
 
-          <div className="mt-auto border-t border-zinc-100 pt-4">
+          <div className="mt-5 border-t border-white/[0.06] pt-5">
             <Link
               href={`/consultants/${resource.id}`}
-              className="inline-flex w-full items-center justify-center rounded-full border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-50"
+              className="inline-flex w-full items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-semibold text-white shadow-md transition duration-200 hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+              style={{ backgroundColor: ACCENT }}
             >
               View profile
             </Link>

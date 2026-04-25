@@ -4,6 +4,7 @@ import type { MarketplaceResource } from "@/components/marketplace-consultant-gr
 import { supabase } from "@/lib/supabase";
 
 const MISSING_TABLE_ERROR_CODE = "42P01";
+const ACCENT = "#ff6a00";
 
 function localIsoDate(d: Date): string {
   const y = d.getFullYear();
@@ -77,32 +78,47 @@ export default async function MarketplacePage() {
       : "Unable to load consultants right now. Please try again shortly."
     : null;
 
+  const noticeClass =
+    "rounded-3xl border border-white/10 bg-black/35 px-5 py-4 text-sm leading-relaxed text-white/75 backdrop-blur-md";
+
   return (
-    <>
-      <AppTopNav />
-      <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-8 bg-white px-6 py-10 md:px-10 md:py-14">
-        <header className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 md:text-4xl">
-            Consultant Marketplace
+    <div className="relative min-h-screen bg-zinc-950 text-zinc-100">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div
+          className="absolute -top-32 left-1/2 h-[min(55vh,28rem)] w-[min(140%,48rem)] -translate-x-1/2 rounded-full opacity-90 blur-3xl"
+          style={{
+            background: `radial-gradient(closest-side, rgba(255,106,0,0.14), transparent 72%)`,
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-zinc-900/90 via-zinc-950 to-black" />
+      </div>
+
+      <AppTopNav variant="hero" />
+
+      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pb-16 pt-8 sm:px-6 md:gap-10 md:px-10 md:pb-20 md:pt-10">
+        <header className="max-w-3xl space-y-3 md:space-y-4">
+          <p
+            className="text-[10px] font-medium uppercase tracking-widest sm:text-[11px]"
+            style={{ color: ACCENT }}
+          >
+            VERIFIED TALENT MARKETPLACE
+          </p>
+          <h1 className="text-balance text-3xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-4xl md:text-[2.35rem] md:leading-[1.08]">
+            Find the right professional for your next project
           </h1>
-          <p className="max-w-2xl text-sm leading-6 text-zinc-600 md:text-base">
-            Discover trusted consultants and specialists. Compare profile highlights and engage the
-            right expertise for your project.
+          <p className="max-w-2xl text-pretty text-sm leading-relaxed text-white/65 sm:text-base">
+            Browse approved talent, check availability, and request interviews or engagements.
           </p>
         </header>
 
         {message ? (
-          <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
-            {message}
-          </p>
+          <p className={noticeClass}>{message}</p>
         ) : resources.length === 0 ? (
-          <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
-            No consultants are available yet.
-          </p>
+          <p className={noticeClass}>No consultants are available yet.</p>
         ) : (
           <MarketplaceWithFilters resources={resources} blockedDateRows={blockedDateRows} />
         )}
       </main>
-    </>
+    </div>
   );
 }

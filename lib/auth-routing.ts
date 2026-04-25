@@ -11,7 +11,8 @@ export type UserProfileRow = {
 
 export function dashboardPathForRole(role: string): string {
   if (role === "company") return "/company";
-  if (role === "consultant") return "/consultant";
+  /** Talent lands on profile edit for onboarding (documents, avatar, availability). */
+  if (role === "consultant") return "/consultant/edit";
   if (role === "admin") return "/admin/resources";
   return "/";
 }
@@ -43,6 +44,7 @@ export function postLoginRedirectPath(role: string, next: string | null | undefi
     return safe;
   }
   if (safe === "/consultant" && role === "consultant") return "/consultant";
+  if (safe === "/consultant/edit" && role === "consultant") return "/consultant/edit";
   if (
     safe != null &&
     (safe === "/admin/resources" || safe.startsWith("/admin/")) &&

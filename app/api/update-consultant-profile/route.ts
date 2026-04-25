@@ -1,3 +1,4 @@
+import { isValidTalentAvatarKey } from "@/lib/talent-avatar-library";
 import { createServiceRoleSupabase } from "@/lib/supabase-service-role";
 import { NextResponse } from "next/server";
 
@@ -8,6 +9,9 @@ type Body = {
   bio?: unknown;
   hourly_rate?: unknown;
   location?: unknown;
+  avatar_key?: unknown;
+  /** Only null is accepted from clients to clear; non-null paths must be set via upload API. */
+  profile_photo_path?: unknown;
 };
 
 function isNonEmptyString(v: unknown): v is string {
@@ -30,12 +34,28 @@ function parseHourlyRate(v: unknown): { ok: true; value: number | null } | { ok:
   return { ok: false };
 }
 
+const FORBIDDEN_DOCUMENT_KEYS = [
+  "cv_document_path",
+  "id_front_document_path",
+  "id_back_document_path",
+] as const;
+
 export async function POST(request: Request) {
   let json: Body;
   try {
     json = (await request.json()) as Body;
   } catch {
     return NextResponse.json({ success: false, error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const raw = json as Record<string, unknown>;
+  for (const k of FORBIDDEN_DOCUMENT_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(raw, k)) {
+      return NextResponse.json(
+        { success: false, error: `Cannot update ${k} via this endpoint; use the document upload API.` },
+        { status: 400 },
+      );
+    }
   }
 
   if (!isNonEmptyString(json.email)) {
@@ -59,6 +79,35 @@ export async function POST(request: Request) {
     );
   }
   const hourly_rate = rateResult.value;
+
+  let avatarKeyUpdate: string | null | undefined;
+  if ("avatar_key" in json) {
+    if (json.avatar_key === null || json.avatar_key === "") {
+      avatarKeyUpdate = null;
+    } else if (isValidTalentAvatarKey(json.avatar_key)) {
+      avatarKeyUpdate = json.avatar_key;
+    } else {
+      return NextResponse.json({ success: false, error: "Invalid avatar_key" }, { status: 400 });
+    }
+  }
+
+  let clearProfilePhoto = false;
+  if ("profile_photo_path" in json) {
+    if (json.profile_photo_path === null || json.profile_photo_path === "") {
+      clearProfilePhoto = true;
+    } else if (typeof json.profile_photo_path === "string") {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "profile_photo_path cannot be set via this endpoint; use the upload API, or send null to clear.",
+        },
+        { status: 400 },
+      );
+    } else {
+      return NextResponse.json({ success: false, error: "Invalid profile_photo_path" }, { status: 400 });
+    }
+  }
 
   const admin = createServiceRoleSupabase();
   if (!admin) {
@@ -98,16 +147,21 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error: updateError } = await admin
-    .from("resources")
-    .update({
-      name,
-      headline,
-      bio,
-      hourly_rate,
-      location,
-    })
-    .eq("id", row.id);
+  const patch: Record<string, unknown> = {
+    name,
+    headline,
+    bio,
+    hourly_rate,
+    location,
+  };
+  if (avatarKeyUpdate !== undefined) {
+    patch.avatar_key = avatarKeyUpdate;
+  }
+  if (clearProfilePhoto) {
+    patch.profile_photo_path = null;
+  }
+
+  const { error: updateError } = await admin.from("resources").update(patch).eq("id", row.id);
 
   if (updateError) {
     console.error("[update-consultant-profile] update", updateError);

@@ -1,5 +1,6 @@
 import { AppTopNav } from "@/components/app-top-nav";
 import { PublicAvailabilityCalendar } from "@/components/public-availability-calendar";
+import { getPublicTalentAvatarDisplay } from "@/lib/talent-avatar-library";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
@@ -7,9 +8,89 @@ import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
+const ACCENT = "#ff6a00";
+
 type PageProps = {
   params: Promise<{ id: string }>;
 };
+
+function TalentAvatarCircle({
+  primary,
+  secondary,
+  label,
+}: {
+  primary: string;
+  secondary: string;
+  label: string;
+}) {
+  return (
+    <div
+      className="relative flex h-[120px] w-[120px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-full border border-white/10 bg-gradient-to-br from-zinc-600/80 via-zinc-800 to-zinc-950 shadow-inner shadow-black/50 md:h-[180px] md:w-[180px]"
+      aria-hidden
+      title={label}
+    >
+      <span className="select-none text-[2.75rem] leading-none md:text-[3.75rem]">{primary}</span>
+      <span className="select-none text-[1.35rem] leading-none md:text-[1.85rem]">{secondary}</span>
+    </div>
+  );
+}
+
+function LockIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+      <path
+        fillRule="evenodd"
+        d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2V7a3 3 0 10-6 0v2h6z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+function MapPinIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden>
+      <path
+        d="M10 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M4.5 8.5c0 3.5 5.5 8 5.5 8s5.5-4.5 5.5-8a5.5 5.5 0 10-11 0z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function RateIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden>
+      <path
+        d="M3.5 6.5h13v7h-13v-7z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path d="M3.5 9.5h13" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function BriefcaseIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden>
+      <path
+        d="M6 7V5.5a2 2 0 012-2h4a2 2 0 012 2V7M4 7h12v9H4V7z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 function formatHourlyRateZar(rate: number | null) {
   if (rate == null) return "Rate on request";
@@ -18,6 +99,11 @@ function formatHourlyRateZar(rate: number | null) {
     currency: "ZAR",
   }).format(rate)} / hr`;
 }
+
+const glassCard = "rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/20 backdrop-blur-md md:p-8";
+const accentEyebrow =
+  "text-[10px] font-semibold uppercase tracking-widest text-[#ff6a00] md:text-[11px]";
+const statLabel = "text-[10px] font-semibold uppercase tracking-widest text-white/45 md:text-[11px]";
 
 export default async function ConsultantProfilePage({ params }: PageProps) {
   const { id } = await params;
@@ -36,7 +122,10 @@ export default async function ConsultantProfilePage({ params }: PageProps) {
 
   const { data, error } = await supabase
     .from("resources")
-    .select("id, name, headline, location, hourly_rate, years_experience, bio, profile_status, created_at, available_from")
+    // Do not select private verification paths (cv_document_path, id_*); never expose on public profile.
+    .select(
+      "id, name, headline, location, hourly_rate, years_experience, bio, profile_status, created_at, available_from, avatar_key",
+    )
     .eq("id", id)
     .eq("profile_status", "approved")
     .single();
@@ -71,73 +160,126 @@ export default async function ConsultantProfilePage({ params }: PageProps) {
         }))
       : [];
 
+  const avatarKey = (data as { avatar_key?: string | null }).avatar_key ?? null;
+  const avatarVisual = getPublicTalentAvatarDisplay(avatarKey, headline, bio);
+
+  const statShell =
+    "flex items-start gap-3 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 backdrop-blur-sm";
+
   return (
     <>
-      <AppTopNav />
-      <main className="mx-auto min-h-screen w-full max-w-4xl bg-white px-6 py-10 md:px-10 md:py-16">
-      <Link
-        href="/marketplace"
-        className="text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-900"
-      >
-        ← Back to marketplace
-      </Link>
-
-      <header className="mt-8 space-y-3 border-b border-zinc-200 pb-10">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">Consultant</p>
-        <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 md:text-4xl">{name}</h1>
-        <p className="text-lg text-zinc-600">{headline ?? "Consultant"}</p>
-      </header>
-
-      <dl className="mt-10 grid grid-cols-1 gap-6 border-b border-zinc-200 pb-10 sm:grid-cols-3">
-        <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Location</dt>
-          <dd className="mt-1 text-base font-medium text-zinc-900">{location ?? "Remote"}</dd>
+      <AppTopNav variant="hero" />
+      <div className="relative min-h-screen bg-zinc-950 text-zinc-100">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+          <div
+            className="absolute -top-24 left-1/2 h-[min(50vh,26rem)] w-[min(130%,44rem)] -translate-x-1/2 rounded-full opacity-90 blur-3xl"
+            style={{
+              background: `radial-gradient(closest-side, rgba(255,106,0,0.12), transparent 72%)`,
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-zinc-900/95 via-zinc-950 to-black" />
         </div>
-        <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Hourly rate</dt>
-          <dd className="mt-1 text-base font-medium text-zinc-900">
-            {formatHourlyRateZar(hourly_rate)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Experience</dt>
-          <dd className="mt-1 text-base font-medium text-zinc-900">
-            {years_experience != null ? `${years_experience} years` : "Not listed"}
-          </dd>
-        </div>
-      </dl>
 
-      <section className="mt-10">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">About</h2>
-        <p className="mt-3 text-base leading-relaxed text-zinc-700">{bio ?? "No bio provided."}</p>
-      </section>
+        <main className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 md:px-10 md:pb-20 md:pt-8">
+          <Link
+            href="/marketplace"
+            className="inline-flex text-sm font-medium text-white/60 transition-colors duration-200 hover:text-white"
+          >
+            ← Back to marketplace
+          </Link>
 
-      <section className="mt-12">
-        <PublicAvailabilityCalendar availableFrom={availableFrom} blockedDates={blockedForCalendar} />
-      </section>
+          <div className={`${glassCard} mt-6`}>
+            <div className="flex flex-col items-center gap-8 md:flex-row md:items-start md:gap-10">
+              <div className="flex shrink-0 flex-col items-center md:items-center">
+                {/* TODO: Later: show profile_photo_path (real photo) only after company payment / unlock. */}
+                <TalentAvatarCircle
+                  primary={avatarVisual.primary}
+                  secondary={avatarVisual.secondary}
+                  label={avatarVisual.label}
+                />
+                <p className="mt-4 flex max-w-[14rem] items-start justify-center gap-2 text-center text-xs leading-snug text-white/55">
+                  <LockIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#ff6a00]" />
+                  <span>Real photo visible after engagement approval</span>
+                </p>
+              </div>
 
-      <section className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50/40 p-6 md:p-8">
-        <h2 className="text-sm font-semibold text-zinc-900">Documents and verification</h2>
-        <p className="mt-2 text-sm leading-relaxed text-zinc-600">
-          Credentials and compliance documents will be listed here after verification is connected.
-        </p>
-      </section>
+              <div className="min-w-0 flex-1 text-center md:text-left">
+                <p className={accentEyebrow}>Talent profile</p>
+                <h1 className="mt-2 text-3xl font-bold tracking-tight text-white md:text-4xl">{name}</h1>
+                <p className="mt-2 text-lg text-white/70 md:text-xl">{headline ?? "Talent"}</p>
 
-      <div className="mt-12 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <Link
-          href={requestInterviewHref}
-          className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-zinc-950 px-6 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 sm:flex-none"
-        >
-          Request interview
-        </Link>
-        <Link
-          href={proposeEngagementHref}
-          className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full border border-zinc-300 bg-white px-6 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-50 sm:flex-none"
-        >
-          Propose engagement
-        </Link>
+                <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className={statShell}>
+                    <MapPinIcon className="mt-0.5 h-5 w-5 shrink-0 text-[#ff6a00]" />
+                    <div className="min-w-0 text-left">
+                      <p className={statLabel}>Location</p>
+                      <p className="mt-1 text-sm font-semibold text-white">{location ?? "Remote"}</p>
+                    </div>
+                  </div>
+                  <div className={statShell}>
+                    <RateIcon className="mt-0.5 h-5 w-5 shrink-0 text-[#ff6a00]" />
+                    <div className="min-w-0 text-left">
+                      <p className={statLabel}>Hourly rate</p>
+                      <p className="mt-1 text-sm font-semibold text-white">{formatHourlyRateZar(hourly_rate)}</p>
+                    </div>
+                  </div>
+                  <div className={statShell}>
+                    <BriefcaseIcon className="mt-0.5 h-5 w-5 shrink-0 text-[#ff6a00]" />
+                    <div className="min-w-0 text-left">
+                      <p className={statLabel}>Experience</p>
+                      <p className="mt-1 text-sm font-semibold text-white">
+                        {years_experience != null ? `${years_experience} years` : "Not listed"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <section className={`${glassCard} mt-6`}>
+            <h2 className={accentEyebrow}>About</h2>
+            <p className="mt-3 text-base leading-relaxed text-white/70">{bio ?? "No bio provided."}</p>
+          </section>
+
+          <section className={`${glassCard} mt-6`}>
+            <PublicAvailabilityCalendar
+              availableFrom={availableFrom}
+              blockedDates={blockedForCalendar}
+              theme="dark"
+            />
+          </section>
+
+          <section className={`${glassCard} mt-6`}>
+            <h2 className="text-sm font-semibold text-white">Documents and verification</h2>
+            <p className="mt-2 text-sm leading-relaxed text-white/55">
+              Credentials and compliance documents will be listed here after verification is connected.
+            </p>
+          </section>
+
+          <div className={`${glassCard} mt-8`}>
+            <h2 className="text-lg font-semibold text-white">Contact this talent</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/60">
+              Request an interview or propose an engagement to start the process.
+            </p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <Link
+                href={requestInterviewHref}
+                className="inline-flex min-h-12 flex-1 items-center justify-center rounded-2xl px-6 text-sm font-semibold text-white shadow-md transition duration-200 hover:brightness-105 sm:flex-none sm:min-w-[11rem]"
+                style={{ backgroundColor: ACCENT }}
+              >
+                Request interview
+              </Link>
+              <Link
+                href={proposeEngagementHref}
+                className="inline-flex min-h-12 flex-1 items-center justify-center rounded-2xl border border-white/15 bg-black/30 px-6 text-sm font-semibold text-white backdrop-blur-sm transition duration-200 hover:border-white/25 hover:bg-black/45 sm:flex-none sm:min-w-[11rem]"
+              >
+                Propose engagement
+              </Link>
+            </div>
+          </div>
+        </main>
       </div>
-      </main>
     </>
   );
 }

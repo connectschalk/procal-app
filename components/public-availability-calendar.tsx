@@ -72,10 +72,14 @@ function buildMonthCells(year: number, month: number) {
 export function PublicAvailabilityCalendar({
   availableFrom,
   blockedDates,
+  theme = "light",
 }: {
   availableFrom: string | null;
   blockedDates: PublicBlockedDate[];
+  /** Dark styling for premium public profile pages */
+  theme?: "light" | "dark";
 }) {
+  const isDark = theme === "dark";
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const n = new Date();
     return { year: n.getFullYear(), month: n.getMonth() };
@@ -113,24 +117,50 @@ export function PublicAvailabilityCalendar({
     return "available";
   }
 
+  const rootClass = isDark
+    ? "rounded-2xl border-0 bg-transparent p-0 text-zinc-100 shadow-none md:p-0"
+    : "rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/[0.04] md:p-8";
+
+  const headingClass = isDark ? "text-sm font-semibold text-white" : "text-sm font-semibold text-zinc-900";
+  const metaStrong = isDark ? "text-zinc-100" : "text-zinc-950";
+  const metaLead = isDark ? "text-sm font-medium text-zinc-300" : "text-sm font-medium text-zinc-800";
+  const hintClass = isDark ? "text-xs leading-relaxed text-zinc-500" : "text-xs leading-relaxed text-zinc-500";
+
+  const innerShell = isDark
+    ? "mt-6 rounded-2xl border border-white/10 bg-black/25 p-4 shadow-inner shadow-black/20 md:p-5"
+    : "mt-6 rounded-2xl border border-zinc-100 bg-gradient-to-b from-zinc-50/80 to-white p-4 shadow-inner shadow-zinc-950/[0.02] md:p-5";
+
+  const navRowBorder = isDark ? "border-b border-white/10 pb-4" : "border-b border-zinc-100/90 pb-4";
+  const navBtn = isDark
+    ? "rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-zinc-100 shadow-sm transition hover:border-orange-500/40 hover:bg-orange-500/10"
+    : "rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-800 shadow-sm transition hover:border-orange-200 hover:bg-orange-50/50";
+  const monthTitle = isDark
+    ? "text-center text-base font-semibold tracking-tight text-white"
+    : "text-center text-base font-semibold tracking-tight text-zinc-950";
+
+  const weekdayClass = isDark
+    ? "py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-zinc-500"
+    : "py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-zinc-500";
+
+  const footerMuted = isDark ? "text-sm text-zinc-500" : "text-sm text-zinc-600";
+  const footerHint = isDark ? "text-xs leading-relaxed text-zinc-500" : "text-xs leading-relaxed text-zinc-500";
+  const footerBorder = isDark ? "mt-6 border-t border-white/10 pt-5" : "mt-6 border-t border-zinc-100 pt-5";
+
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/[0.04] md:p-8">
-      <h2 className="text-sm font-semibold text-zinc-900">Availability</h2>
+    <div className={rootClass}>
+      <h2 className={headingClass}>Availability</h2>
 
       <div className="mt-4 space-y-1">
-        <p className="text-sm font-medium text-zinc-800">
-          Available from:{" "}
-          <span className="text-zinc-950">
-            {effectiveFrom != null ? formatMedium(effectiveFrom) : "Not specified"}
-          </span>
+        <p className={metaLead}>
+          Available from: <span className={metaStrong}>{effectiveFrom != null ? formatMedium(effectiveFrom) : "Not specified"}</span>
         </p>
-        <p className="text-xs leading-relaxed text-zinc-500">
+        <p className={hintClass}>
           This calendar shows published availability. Final scheduling is confirmed after request review.
         </p>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-zinc-100 bg-gradient-to-b from-zinc-50/80 to-white p-4 shadow-inner shadow-zinc-950/[0.02] md:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100/90 pb-4">
+      <div className={innerShell}>
+        <div className={`flex flex-wrap items-center justify-between gap-3 ${navRowBorder}`}>
           <button
             type="button"
             aria-label="Previous month"
@@ -140,11 +170,11 @@ export function PublicAvailabilityCalendar({
                 return { year: d.getFullYear(), month: d.getMonth() };
               })
             }
-            className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-800 shadow-sm transition hover:border-orange-200 hover:bg-orange-50/50"
+            className={navBtn}
           >
             ← Previous month
           </button>
-          <h3 className="text-center text-base font-semibold tracking-tight text-zinc-950">
+          <h3 className={monthTitle}>
             {new Intl.DateTimeFormat("en-ZA", { month: "long", year: "numeric" }).format(
               new Date(visibleMonth.year, visibleMonth.month, 1),
             )}
@@ -158,7 +188,7 @@ export function PublicAvailabilityCalendar({
                 return { year: d.getFullYear(), month: d.getMonth() };
               })
             }
-            className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-800 shadow-sm transition hover:border-orange-200 hover:bg-orange-50/50"
+            className={navBtn}
           >
             Next month →
           </button>
@@ -167,11 +197,7 @@ export function PublicAvailabilityCalendar({
         <div className="select-none pt-4" role="grid" aria-label="Availability calendar">
           <div className="grid grid-cols-7 gap-1">
             {WEEKDAY_LABELS_MON.map((w) => (
-              <div
-                key={w}
-                className="py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-zinc-500"
-                role="columnheader"
-              >
+              <div key={w} className={weekdayClass} role="columnheader">
                 {w}
               </div>
             ))}
@@ -201,15 +227,23 @@ export function PublicAvailabilityCalendar({
                 cls +=
                   " border-orange-800/80 bg-gradient-to-br from-orange-600 to-orange-800 text-white shadow-md shadow-orange-950/20";
               } else if (kind === "not_yet") {
-                cls += " border-zinc-200/60 bg-zinc-100/80 text-zinc-500";
+                cls += isDark
+                  ? " border-white/5 bg-zinc-800/40 text-zinc-500"
+                  : " border-zinc-200/60 bg-zinc-100/80 text-zinc-500";
               } else if (kind === "outside_muted") {
-                cls += " border-transparent bg-zinc-50/50 text-zinc-400";
+                cls += isDark
+                  ? " border-transparent bg-zinc-900/30 text-zinc-600"
+                  : " border-transparent bg-zinc-50/50 text-zinc-400";
               } else {
-                cls += " border-zinc-200/90 bg-white text-zinc-900";
+                cls += isDark
+                  ? " border-white/10 bg-white/5 text-zinc-100"
+                  : " border-zinc-200/90 bg-white text-zinc-900";
               }
 
               if (isToday) {
-                cls += " ring-2 ring-orange-400/90 ring-offset-2 ring-offset-white";
+                cls += isDark
+                  ? " ring-2 ring-orange-400/90 ring-offset-2 ring-offset-zinc-950"
+                  : " ring-2 ring-orange-400/90 ring-offset-2 ring-offset-white";
               }
 
               return (
@@ -233,11 +267,11 @@ export function PublicAvailabilityCalendar({
         </div>
       </div>
 
-      <div className="mt-6 border-t border-zinc-100 pt-5">
+      <div className={footerBorder}>
         {!hasAnyBlocked ? (
-          <p className="text-sm text-zinc-600">No blocked days published.</p>
+          <p className={footerMuted}>No blocked days published.</p>
         ) : (
-          <p className="text-xs leading-relaxed text-zinc-500">
+          <p className={footerHint}>
             Blocked days are shown on the calendar. Hover a day for details when a reason was provided.
           </p>
         )}

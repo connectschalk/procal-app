@@ -10,6 +10,13 @@ import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
+const ACCENT = "#ff6a00";
+
+const glassCard =
+  "rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/25 backdrop-blur-md md:p-8";
+const inputClass =
+  "min-w-0 rounded-xl border border-white/10 bg-zinc-900/70 px-4 py-3 text-sm text-zinc-100 shadow-inner shadow-black/20 outline-none transition placeholder:text-zinc-500 focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25";
+
 export function InterviewRequestForm({
   resourceId,
   consultantName,
@@ -128,31 +135,33 @@ export function InterviewRequestForm({
 
   if (success) {
     return (
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-6 md:p-8">
-        <p className="text-base font-medium text-emerald-950">
-          Interview request submitted. The consultant will review your proposed slots.
+      <div className={`${glassCard} border-emerald-500/25 bg-emerald-950/20`}>
+        <p className="text-base font-semibold text-emerald-100">Request sent</p>
+        <p className="mt-2 text-sm leading-relaxed text-white/65">
+          {consultantName} will review your proposed times. You’ll receive a confirmation once the talent responds.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
             href="/company"
-            className="inline-flex items-center justify-center rounded-full border border-orange-300 bg-orange-50 px-5 py-2.5 text-sm font-semibold text-orange-950 hover:bg-orange-100"
+            className="inline-flex min-h-11 items-center justify-center rounded-2xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:brightness-105"
+            style={{ backgroundColor: ACCENT }}
           >
             Track my request
           </Link>
           <Link
             href={`/consultants/${resourceId}`}
-            className="inline-flex items-center justify-center rounded-full border border-emerald-300 bg-white px-5 py-2.5 text-sm font-medium text-emerald-900 hover:bg-emerald-50"
+            className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/15 bg-black/30 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-black/45"
           >
             Back to profile
           </Link>
           <Link
             href="/marketplace"
-            className="inline-flex items-center justify-center rounded-full bg-emerald-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-800"
+            className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/12 px-5 py-2.5 text-sm font-medium text-white/80 transition hover:border-white/20 hover:text-white"
           >
             Marketplace
           </Link>
         </div>
-        <p className="mt-4 text-sm leading-relaxed text-emerald-900/70">
+        <p className="mt-4 text-xs leading-relaxed text-white/45">
           Use the same email address you submitted with to open your company dashboard.
         </p>
       </div>
@@ -160,67 +169,16 @@ export function InterviewRequestForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      <p className="text-sm text-zinc-600">
-        Requesting interview with <span className="font-medium text-zinc-900">{consultantName}</span>
-      </p>
+    <div className={glassCard}>
+      <header className="border-b border-white/10 pb-5">
+        <h2 className="text-xl font-bold tracking-tight text-white md:text-2xl">Request an interview</h2>
+        <p className="mt-1.5 text-sm text-white/55">Choose a time that works for you</p>
+      </header>
 
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-zinc-800">Company name</span>
-        <input
-          required
-          type="text"
-          value={companyName}
-          onChange={(e) => setCompanyName(e.target.value)}
-          className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none ring-zinc-950 focus:ring-2"
-        />
-      </label>
-
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-zinc-800">Your name</span>
-        <input
-          required
-          type="text"
-          value={requesterName}
-          onChange={(e) => setRequesterName(e.target.value)}
-          className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none ring-zinc-950 focus:ring-2"
-        />
-      </label>
-
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-zinc-800">Work email</span>
-        <input
-          required
-          type="email"
-          value={requesterEmail}
-          onChange={(e) => setRequesterEmail(e.target.value)}
-          className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none ring-zinc-950 focus:ring-2"
-        />
-      </label>
-
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-zinc-800">Message</span>
-        <textarea
-          rows={4}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Context for the interview, role, or timeline"
-          className="resize-y rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none ring-zinc-950 placeholder:text-zinc-400 focus:ring-2"
-        />
-      </label>
-
-      <div className="rounded-2xl border border-zinc-200/90 bg-zinc-50/50 p-5 shadow-sm shadow-zinc-950/[0.03] md:p-6">
-        <div className="space-y-1.5">
-          <h2 className="text-sm font-semibold tracking-tight text-zinc-950">Choose interview times</h2>
-          <p className="text-xs leading-relaxed text-zinc-600">
-            Pick a date, then tap up to three 30-minute slots. Times use your device timezone.
-          </p>
-          <p className="text-xs leading-relaxed text-zinc-700">
-            This consultant may have limited availability. Select suitable dates where possible.
-          </p>
-        </div>
-        <div className="mt-5">
+      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-6">
+        <div>
           <InterviewSlotPicker
+            variant="booking"
             resourceId={resourceId}
             selectedSlots={pickedSlots}
             onChange={(next) => {
@@ -228,29 +186,89 @@ export function InterviewRequestForm({
               setSlotsError(null);
             }}
           />
+          {slotsError ? (
+            <p className="mt-3 rounded-xl border border-red-500/30 bg-red-950/40 px-3 py-2 text-sm text-red-100">
+              {slotsError}
+            </p>
+          ) : null}
         </div>
-        {slotsError ? <p className="mt-3 text-sm text-red-600">{slotsError}</p> : null}
-      </div>
 
-      {error ? (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
-      ) : null}
+        <div className="space-y-4 border-t border-white/10 pt-5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-white/45">Contact details</p>
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-medium text-white/55">Company</span>
+            <input
+              required
+              type="text"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              className={inputClass}
+              autoComplete="organization"
+            />
+          </label>
 
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-zinc-950 px-6 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 disabled:opacity-60"
-        >
-          {submitting ? "Submitting…" : "Submit request"}
-        </button>
-        <Link
-          href={`/consultants/${resourceId}`}
-          className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full border border-zinc-300 bg-white px-6 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-50"
-        >
-          Cancel
-        </Link>
-      </div>
-    </form>
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-medium text-white/55">Your name</span>
+            <input
+              required
+              type="text"
+              value={requesterName}
+              onChange={(e) => setRequesterName(e.target.value)}
+              className={inputClass}
+              autoComplete="name"
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-medium text-white/55">Work email</span>
+            <input
+              required
+              type="email"
+              value={requesterEmail}
+              onChange={(e) => setRequesterEmail(e.target.value)}
+              className={inputClass}
+              autoComplete="email"
+            />
+          </label>
+        </div>
+
+        <label className="flex flex-col gap-2 text-sm">
+          <span className="font-medium text-white/55">Add a message (optional)</span>
+          <textarea
+            rows={3}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Role, timeline, or context for the interview"
+            className={`${inputClass} resize-y`}
+          />
+        </label>
+
+        {error ? (
+          <p className="rounded-xl border border-red-500/30 bg-red-950/40 px-4 py-3 text-sm text-red-100">
+            {error}
+          </p>
+        ) : null}
+
+        <div className="flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center">
+          <button
+            type="submit"
+            disabled={submitting}
+            className="inline-flex min-h-12 flex-1 items-center justify-center rounded-2xl px-6 text-sm font-semibold text-white shadow-md transition hover:brightness-105 disabled:opacity-60"
+            style={{ backgroundColor: ACCENT }}
+          >
+            {submitting ? "Submitting…" : "Request interview"}
+          </button>
+          <Link
+            href={`/consultants/${resourceId}`}
+            className="inline-flex min-h-12 flex-1 items-center justify-center rounded-2xl border border-white/15 bg-black/25 px-6 text-sm font-semibold text-white/85 backdrop-blur-sm transition hover:bg-black/40"
+          >
+            Cancel
+          </Link>
+        </div>
+        <p className="text-center text-xs leading-relaxed text-white/45 sm:text-left">
+          You’ll receive a confirmation once the talent responds.
+        </p>
+      </form>
+    </div>
   );
 }

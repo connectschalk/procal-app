@@ -85,7 +85,7 @@ function ConsultantAvailabilityContext({
   const fromIso = availableFrom != null && availableFrom.trim() !== "" ? availableFrom.trim() : null;
   const blockedIso = nextBlocked != null && nextBlocked.trim() !== "" ? nextBlocked.trim() : null;
   return (
-    <div className="mt-1 space-y-0.5 text-xs text-zinc-500">
+    <div className="mt-1 space-y-0.5 text-xs text-white/45">
       {fromIso != null ? <p>Available from {formatCardDate(fromIso)}</p> : <p>Available now</p>}
       {blockedIso != null ? <p>Next unavailable: {formatCardDate(blockedIso)}</p> : null}
     </div>
@@ -103,26 +103,26 @@ function formatRateZar(rate: number | null) {
 function statusBadgeClasses(status: string) {
   const s = status.toLowerCase();
   if (s === "accepted") {
-    return "bg-emerald-100 text-emerald-900 ring-1 ring-emerald-200/80";
+    return "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-500/35";
   }
   if (s === "declined") {
-    return "bg-red-100 text-red-900 ring-1 ring-red-200/80";
+    return "bg-red-500/20 text-red-200 ring-1 ring-red-500/35";
   }
-  return "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200/80";
+  return "bg-white/10 text-white/75 ring-1 ring-white/15";
 }
 
 function filterPillClass(active: boolean) {
   if (active) {
-    return "rounded-full border border-orange-500 bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-orange-950/10";
+    return "rounded-full border border-[#ff6a00] bg-[#ff6a00] px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-black/30";
   }
-  return "rounded-full border border-zinc-200/90 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:border-orange-200 hover:bg-orange-50/50";
+  return "rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-white/65 transition hover:border-white/20 hover:bg-white/[0.08]";
 }
 
 function kindTabClass(active: boolean) {
   if (active) {
-    return "rounded-full border border-zinc-900 bg-zinc-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm shadow-zinc-950/10";
+    return "rounded-full border border-[#ff6a00] bg-[#ff6a00] px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm shadow-black/30";
   }
-  return "rounded-full border border-zinc-200/90 bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50/80";
+  return "rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1.5 text-xs font-semibold text-white/65 transition hover:border-white/20 hover:bg-white/[0.08]";
 }
 
 function profileLabel(name: string | null) {
@@ -398,54 +398,70 @@ export default function ConsultantDashboardPage() {
 
   return (
     <>
-      <AppTopNav />
-      <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-8 bg-white px-6 py-10 md:px-10 md:py-14">
-        <header className="space-y-2">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-2">
-              <h1 className="text-2xl font-semibold tracking-tight text-zinc-950 md:text-3xl">Talent Dashboard</h1>
-              <p className="text-sm leading-relaxed text-zinc-600">
-                View interview requests and engagement proposals tied to your Procal talent profile.
-              </p>
-            </div>
-            {dashboardEmail != null ? (
-              <div className="flex shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
-                {hasLoaded && !noProfileForEmail ? (
-                  <>
-                    <Link
-                      href="/consultant/edit"
-                      className="inline-flex items-center justify-center rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-50"
-                    >
-                      Edit profile
-                    </Link>
-                    <Link
-                      href="/consultant/availability"
-                      className="inline-flex items-center justify-center rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-50"
-                    >
-                      Manage availability
-                    </Link>
-                  </>
+      <AppTopNav variant="hero" />
+      <div className="relative min-h-screen bg-zinc-950 text-zinc-100">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+          <div
+            className="absolute -top-32 left-1/2 h-[min(55vh,28rem)] w-[min(140%,48rem)] -translate-x-1/2 rounded-full opacity-90 blur-3xl"
+            style={{
+              background: "radial-gradient(closest-side, rgba(255,106,0,0.14), transparent 72%)",
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-zinc-900/90 via-zinc-950 to-black" />
+        </div>
+        <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-6 sm:px-6 md:gap-8 md:px-10 md:pb-20 md:pt-8">
+          <header className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/25 backdrop-blur-md md:p-8">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-[#ff6a00] md:text-[11px]">
+              Talent dashboard
+            </p>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">Manage your opportunities</h1>
+                <p className="mt-2 text-sm leading-relaxed text-white/60">
+                  Track interview requests, engagement proposals, and your profile visibility.
+                </p>
+                {dashboardEmail != null ? (
+                  <p className="mt-3 text-xs text-white/45">Showing talent profile for {dashboardEmail}</p>
                 ) : null}
               </div>
-            ) : null}
-          </div>
-          {dashboardEmail != null ? (
-            <p className="text-xs text-zinc-500">Showing talent profile for {dashboardEmail}</p>
-          ) : null}
-        </header>
+              <div className="grid w-full gap-2 sm:w-auto sm:min-w-[15rem]">
+                <Link
+                  href="/consultant/edit"
+                  className="inline-flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition hover:border-[#ff6a00]/45 hover:bg-white/[0.08]"
+                >
+                  Edit profile
+                  <span className="text-white/40">→</span>
+                </Link>
+                <Link
+                  href="/consultant/availability"
+                  className="inline-flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition hover:border-[#ff6a00]/45 hover:bg-white/[0.08]"
+                >
+                  Manage availability
+                  <span className="text-white/40">→</span>
+                </Link>
+                <Link
+                  href="/marketplace"
+                  className="inline-flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition hover:border-[#ff6a00]/45 hover:bg-white/[0.08]"
+                >
+                  View marketplace
+                  <span className="text-white/40">→</span>
+                </Link>
+              </div>
+            </div>
+          </header>
 
         {loading ? (
-          <p className="text-sm text-zinc-500">Loading your dashboard…</p>
+          <p className="text-sm text-white/50">Loading your dashboard…</p>
         ) : null}
 
         {hasLoaded && !noProfileForEmail && hasUnclaimedProfile ? (
-          <div className="flex flex-col gap-3 rounded-2xl border border-amber-200/90 bg-amber-50/80 px-5 py-4 md:flex-row md:items-center md:justify-between md:px-6">
-            <p className="text-sm font-medium text-amber-950">
+          <div className="flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-950/25 px-5 py-4 md:flex-row md:items-center md:justify-between md:px-6">
+            <p className="text-sm font-medium text-amber-100">
               Claim your profile to manage your information
             </p>
             <Link
               href="/consultant/claim"
-              className="inline-flex shrink-0 items-center justify-center rounded-full bg-amber-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-800"
+              className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-[#ff6a00] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-105"
             >
               Claim profile
             </Link>
@@ -453,53 +469,66 @@ export default function ConsultantDashboardPage() {
         ) : null}
 
         {error ? (
-          <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
+          <p className="rounded-xl border border-red-500/30 bg-red-950/40 px-4 py-3 text-sm text-red-100">{error}</p>
         ) : null}
 
         {hasLoaded && noProfileForEmail ? (
-          <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+          <p className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/70">
             No talent profile found for this email.
           </p>
         ) : null}
 
         {hasLoaded && !noProfileForEmail && !error && bothEmpty ? (
-          <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
-            No interview requests or engagement proposals yet for your profile(s).
-          </p>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm text-white/65">
+            <p>No interview requests or engagement proposals yet for your profile(s).</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link href="/consultant/edit" className="text-[#ff6a00] hover:underline">
+                Edit profile
+              </Link>
+              <span className="text-white/30">•</span>
+              <Link href="/consultant/availability" className="text-[#ff6a00] hover:underline">
+                Manage availability
+              </Link>
+            </div>
+          </div>
         ) : null}
 
         {hasLoaded && !noProfileForEmail && !error && !bothEmpty ? (
           <>
             <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <div className="rounded-2xl border border-zinc-200/90 bg-white p-4 shadow-sm shadow-zinc-950/[0.03]">
-                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Total interview requests</p>
-                <p className="mt-2 text-2xl font-semibold tabular-nums text-zinc-950">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-black/20 backdrop-blur-md">
+                <p className="text-xs font-medium uppercase tracking-wide text-white/50">Total interview requests</p>
+                <p className="mt-2 text-2xl font-semibold tabular-nums text-white">
                   {interviewCounts?.total ?? 0}
                 </p>
               </div>
-              <div className="rounded-2xl border border-zinc-200/90 bg-white p-4 shadow-sm shadow-zinc-950/[0.03]">
-                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Accepted interviews</p>
-                <p className="mt-2 text-2xl font-semibold tabular-nums text-emerald-800">
+              <div className="rounded-2xl border border-[#ff6a00]/30 bg-[#ff6a00]/10 p-4 shadow-lg shadow-black/20 backdrop-blur-md">
+                <p className="text-xs font-medium uppercase tracking-wide text-white/60">Accepted interviews</p>
+                <p className="mt-2 text-2xl font-semibold tabular-nums text-[#ffb37a]">
                   {interviewCounts?.accepted ?? 0}
                 </p>
               </div>
-              <div className="rounded-2xl border border-zinc-200/90 bg-white p-4 shadow-sm shadow-zinc-950/[0.03]">
-                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Total proposals</p>
-                <p className="mt-2 text-2xl font-semibold tabular-nums text-zinc-950">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-black/20 backdrop-blur-md">
+                <p className="text-xs font-medium uppercase tracking-wide text-white/50">Total proposals</p>
+                <p className="mt-2 text-2xl font-semibold tabular-nums text-white">
                   {proposalCounts?.total ?? 0}
                 </p>
               </div>
-              <div className="rounded-2xl border border-zinc-200/90 bg-white p-4 shadow-sm shadow-zinc-950/[0.03]">
-                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Accepted proposals</p>
-                <p className="mt-2 text-2xl font-semibold tabular-nums text-emerald-800">
+              <div className="rounded-2xl border border-[#ff6a00]/30 bg-[#ff6a00]/10 p-4 shadow-lg shadow-black/20 backdrop-blur-md">
+                <p className="text-xs font-medium uppercase tracking-wide text-white/60">Accepted proposals</p>
+                <p className="mt-2 text-2xl font-semibold tabular-nums text-[#ffb37a]">
                   {proposalCounts?.accepted ?? 0}
                 </p>
               </div>
             </section>
 
             <div className="flex flex-col gap-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">View</p>
-              <div className="flex flex-wrap gap-2" role="tablist" aria-label="Content type">
+              <p className="text-xs font-medium uppercase tracking-wide text-white/50">View</p>
+              <div
+                className="inline-flex w-fit flex-wrap gap-2 rounded-full border border-white/10 bg-white/[0.04] p-1"
+                role="tablist"
+                aria-label="Content type"
+              >
                 {(["all", "interviews", "proposals"] as const).map((k) => (
                   <button
                     key={k}
@@ -518,8 +547,12 @@ export default function ConsultantDashboardPage() {
             {showInterviews ? (
               <section className="flex flex-col gap-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <h2 className="text-sm font-semibold text-zinc-900">Interview requests</h2>
-                  <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter interviews by status">
+                  <h2 className="text-sm font-semibold text-white">Interview requests</h2>
+                  <div
+                    className="flex flex-wrap gap-2 rounded-full border border-white/10 bg-white/[0.04] p-1"
+                    role="tablist"
+                    aria-label="Filter interviews by status"
+                  >
                     {(["all", "requested", "accepted", "declined"] as const).map((f) => (
                       <button
                         key={f}
@@ -536,11 +569,11 @@ export default function ConsultantDashboardPage() {
                 </div>
 
                 {totalInterviews === 0 ? (
-                  <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+                  <p className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/65">
                     No interview requests yet.
                   </p>
                 ) : filteredInterviews.length === 0 ? (
-                  <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+                  <p className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/65">
                     No interview requests match this filter.
                   </p>
                 ) : (
@@ -553,21 +586,21 @@ export default function ConsultantDashboardPage() {
                       return (
                         <li
                           key={row.id}
-                          className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/5 md:p-6"
+                          className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/20 backdrop-blur-md md:p-6"
                         >
-                          <p className="text-xs text-zinc-500">
-                            <span className="font-medium text-zinc-600">Talent:</span>{" "}
+                          <p className="text-xs text-white/45">
+                            <span className="font-medium text-white/60">Talent:</span>{" "}
                             {profileLabel(row.consultant_name)}
                           </p>
                           <ConsultantAvailabilityContext
                             availableFrom={row.available_from}
                             nextBlocked={row.next_blocked_date}
                           />
-                          <div className="mt-2 flex flex-col gap-2 border-b border-zinc-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="mt-2 flex flex-col gap-2 border-b border-white/10 pb-4 sm:flex-row sm:items-start sm:justify-between">
                             <div>
-                              <p className="text-base font-semibold tracking-tight text-zinc-950">{row.company_name}</p>
-                              <p className="mt-1 text-sm text-zinc-600">
-                                <span className="font-medium text-zinc-800">Contact:</span>{" "}
+                              <p className="text-base font-semibold tracking-tight text-white">{row.company_name}</p>
+                              <p className="mt-1 text-sm text-white/60">
+                                <span className="font-medium text-white/75">Contact:</span>{" "}
                                 {row.requester_name.trim() || "—"}
                               </p>
                             </div>
@@ -577,7 +610,7 @@ export default function ConsultantDashboardPage() {
                               >
                                 {row.status}
                               </span>
-                              <span className="text-xs text-zinc-500">
+                              <span className="text-xs text-white/45">
                                 Submitted{" "}
                                 {row.created_at
                                   ? new Intl.DateTimeFormat("en-ZA", {
@@ -590,32 +623,32 @@ export default function ConsultantDashboardPage() {
                           </div>
 
                           <div className="mt-4">
-                            <h3 className="text-xs font-medium uppercase tracking-wide text-zinc-500">Message</h3>
-                            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-zinc-700">
+                            <h3 className="text-xs font-medium uppercase tracking-wide text-white/45">Message</h3>
+                            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-white/70">
                               {row.message?.trim() ? row.message : "—"}
                             </p>
                           </div>
 
                           <div className="mt-4">
-                            <h3 className="text-xs font-medium uppercase tracking-wide text-zinc-500">Proposed slots</h3>
-                            <div className="mt-2 grid gap-2 text-sm text-zinc-800 sm:grid-cols-3">
-                              <div className="rounded-lg border border-zinc-100 bg-zinc-50/80 px-3 py-2">
-                                <span className="text-xs text-zinc-500">Slot 1</span>
+                            <h3 className="text-xs font-medium uppercase tracking-wide text-white/45">Proposed slots</h3>
+                            <div className="mt-2 grid gap-2 text-sm text-white/85 sm:grid-cols-3">
+                              <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
+                                <span className="text-xs text-white/45">Slot 1</span>
                                 <p className="font-medium">{formatSlot(row.proposed_slot_1)}</p>
                               </div>
-                              <div className="rounded-lg border border-zinc-100 bg-zinc-50/80 px-3 py-2">
-                                <span className="text-xs text-zinc-500">Slot 2</span>
+                              <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
+                                <span className="text-xs text-white/45">Slot 2</span>
                                 <p className="font-medium">{formatSlot(row.proposed_slot_2)}</p>
                               </div>
-                              <div className="rounded-lg border border-zinc-100 bg-zinc-50/80 px-3 py-2">
-                                <span className="text-xs text-zinc-500">Slot 3</span>
+                              <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
+                                <span className="text-xs text-white/45">Slot 3</span>
                                 <p className="font-medium">{formatSlot(row.proposed_slot_3)}</p>
                               </div>
                             </div>
                           </div>
 
                           {accepted ? (
-                            <p className="mt-4 text-sm font-medium text-emerald-900">
+                            <p className="mt-4 text-sm font-medium text-[#ffb37a]">
                               Confirmed time: {formatSlot(row.selected_slot)}
                             </p>
                           ) : null}
@@ -629,10 +662,10 @@ export default function ConsultantDashboardPage() {
 
             {showProposals ? (
               <section className="flex flex-col gap-4">
-                <h2 className="text-sm font-semibold text-zinc-900">Engagement proposals</h2>
+                <h2 className="text-sm font-semibold text-white">Engagement proposals</h2>
 
                 {totalProposals === 0 ? (
-                  <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+                  <p className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/65">
                     No engagement proposals yet.
                   </p>
                 ) : (
@@ -640,21 +673,21 @@ export default function ConsultantDashboardPage() {
                     {(proposalRows ?? []).map((row) => (
                       <li
                         key={row.id}
-                        className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/5 md:p-6"
+                        className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/20 backdrop-blur-md md:p-6"
                       >
-                        <p className="text-xs text-zinc-500">
-                          <span className="font-medium text-zinc-600">Talent:</span>{" "}
+                        <p className="text-xs text-white/45">
+                          <span className="font-medium text-white/60">Talent:</span>{" "}
                           {profileLabel(row.consultant_name)}
                         </p>
                         <ConsultantAvailabilityContext
                           availableFrom={row.available_from}
                           nextBlocked={row.next_blocked_date}
                         />
-                        <div className="mt-2 flex flex-col gap-2 border-b border-zinc-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="mt-2 flex flex-col gap-2 border-b border-white/10 pb-4 sm:flex-row sm:items-start sm:justify-between">
                           <div>
-                            <p className="text-base font-semibold tracking-tight text-zinc-950">{row.company_name}</p>
-                            <p className="mt-1 text-sm text-zinc-600">
-                              <span className="font-medium text-zinc-800">Requester:</span>{" "}
+                            <p className="text-base font-semibold tracking-tight text-white">{row.company_name}</p>
+                            <p className="mt-1 text-sm text-white/60">
+                              <span className="font-medium text-white/75">Requester:</span>{" "}
                               {row.requester_name.trim() || "—"}
                             </p>
                           </div>
@@ -664,7 +697,7 @@ export default function ConsultantDashboardPage() {
                             >
                               {row.status}
                             </span>
-                            <span className="text-xs text-zinc-500">
+                            <span className="text-xs text-white/45">
                               Submitted{" "}
                               {row.created_at
                                 ? new Intl.DateTimeFormat("en-ZA", {
@@ -678,22 +711,22 @@ export default function ConsultantDashboardPage() {
 
                         <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
                           <div>
-                            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Start</dt>
-                            <dd className="mt-1 font-medium text-zinc-800">{formatProposalDate(row.proposed_start_date)}</dd>
+                            <dt className="text-xs font-medium uppercase tracking-wide text-white/45">Start</dt>
+                            <dd className="mt-1 font-medium text-white/80">{formatProposalDate(row.proposed_start_date)}</dd>
                           </div>
                           <div>
-                            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">End</dt>
-                            <dd className="mt-1 font-medium text-zinc-800">{formatProposalDate(row.proposed_end_date)}</dd>
+                            <dt className="text-xs font-medium uppercase tracking-wide text-white/45">End</dt>
+                            <dd className="mt-1 font-medium text-white/80">{formatProposalDate(row.proposed_end_date)}</dd>
                           </div>
                           <div>
-                            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Proposed rate</dt>
-                            <dd className="mt-1 font-medium text-zinc-800">{formatRateZar(row.proposed_rate)}</dd>
+                            <dt className="text-xs font-medium uppercase tracking-wide text-white/45">Proposed rate</dt>
+                            <dd className="mt-1 font-medium text-white/80">{formatRateZar(row.proposed_rate)}</dd>
                           </div>
                         </dl>
 
-                        <div className="mt-4 border-t border-zinc-100 pt-4">
-                          <h3 className="text-xs font-medium uppercase tracking-wide text-zinc-500">Scope</h3>
-                          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-zinc-700">
+                        <div className="mt-4 border-t border-white/10 pt-4">
+                          <h3 className="text-xs font-medium uppercase tracking-wide text-white/45">Scope</h3>
+                          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-white/70">
                             {row.scope?.trim() ? row.scope : "—"}
                           </p>
                         </div>
@@ -705,7 +738,8 @@ export default function ConsultantDashboardPage() {
             ) : null}
           </>
         ) : null}
-      </main>
+        </main>
+      </div>
     </>
   );
 }

@@ -568,6 +568,15 @@ export default function ConsultantEditProfilePage() {
                       <p className="mt-2 text-xs leading-relaxed text-white/55">
                         Uploaded photo saved privately. Public photo unlock will be added later.
                       </p>
+                      <p
+                        className={`mt-3 inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs font-medium ${
+                          profilePhotoPath != null && profilePhotoPath.trim() !== ""
+                            ? "border-green-500/30 bg-green-950/20 text-green-400"
+                            : "border-white/10 bg-black/20 text-amber-200/90"
+                        }`}
+                      >
+                        {profilePhotoPath != null && profilePhotoPath.trim() !== "" ? "✓ Uploaded" : "Missing"}
+                      </p>
                       <label className="mt-3 inline-flex w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/20 px-3 py-2.5 text-sm font-medium text-white/80 transition hover:border-orange-500/40 hover:bg-black/35">
                         <input
                           type="file"
@@ -580,7 +589,11 @@ export default function ConsultantEditProfilePage() {
                             void handlePhotoSelected(f);
                           }}
                         />
-                        {uploadBusy ? "Uploading…" : "Choose file"}
+                        {uploadBusy
+                          ? "Uploading…"
+                          : profilePhotoPath != null && profilePhotoPath.trim() !== ""
+                            ? "Replace photo"
+                            : "Choose file"}
                       </label>
                       {profilePhotoPath != null && profilePhotoPath !== "" ? (
                         <div className="mt-3 space-y-2">
@@ -648,11 +661,11 @@ export default function ConsultantEditProfilePage() {
                               <span
                                 className={
                                   row.path != null && row.path.trim() !== ""
-                                    ? "text-xs font-medium text-emerald-400"
+                                    ? "text-xs font-medium text-green-400"
                                     : "text-xs font-medium text-amber-200/90"
                                 }
                               >
-                                {row.path != null && row.path.trim() !== "" ? "Uploaded" : "Missing"}
+                                {row.path != null && row.path.trim() !== "" ? "✓ Uploaded" : "Missing"}
                               </span>
                             </div>
                             <label className="mt-2 inline-flex w-full cursor-pointer items-center justify-center rounded-lg border border-dashed border-white/18 bg-black/25 px-2 py-2 text-xs font-medium text-white/80 transition hover:border-orange-500/35 hover:bg-black/35">
@@ -667,7 +680,15 @@ export default function ConsultantEditProfilePage() {
                                   void handleTalentDocumentUpload(row.type, f);
                                 }}
                               />
-                              {docUploading === row.type ? "Uploading…" : `Choose ${row.title} file`}
+                              {docUploading === row.type
+                                ? "Uploading…"
+                                : row.path != null && row.path.trim() !== ""
+                                  ? row.type === "cv"
+                                    ? "Replace CV"
+                                    : row.type === "id_front"
+                                      ? "Replace ID front"
+                                      : "Replace ID back"
+                                  : `Choose ${row.title} file`}
                             </label>
                             {row.path != null && row.path.trim() !== "" ? (
                               <button

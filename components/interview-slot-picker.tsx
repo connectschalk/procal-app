@@ -147,9 +147,16 @@ export type InterviewSlotPickerProps = {
   onChange: (slots: string[]) => void;
   /** When set, loads `available_from` and blocked dates to fade/disable days (visual guide only). */
   resourceId?: string;
+  /** Premium dark layout: horizontal days + slot chip grid (same selection rules as default). */
+  variant?: "default" | "booking";
 };
 
-export function InterviewSlotPicker({ selectedSlots, onChange, resourceId }: InterviewSlotPickerProps) {
+export function InterviewSlotPicker({
+  selectedSlots,
+  onChange,
+  resourceId,
+  variant = "default",
+}: InterviewSlotPickerProps) {
   const days = useMemo(() => getNext7Days(new Date()), []);
   const [selectedDate, setSelectedDate] = useState<Date>(() => days[0] ?? new Date());
   const [durationMin, setDurationMin] = useState<InterviewDurationMin>(30);
@@ -220,10 +227,11 @@ export function InterviewSlotPicker({ selectedSlots, onChange, resourceId }: Int
   }, [availabilityReady, selectedDateKey, days, selectedDate]);
 
   useLayoutEffect(() => {
+    if (variant === "booking") return;
     const container = scrollRef.current;
     if (!container) return;
     scrollTimeRailToSlot(container, DAY_START_MIN);
-  }, [selectedDateKey]);
+  }, [selectedDateKey, variant]);
 
   function isSelectedDayRestricted(): boolean {
     if (availabilityReady == null) return false;
@@ -260,13 +268,36 @@ export function InterviewSlotPicker({ selectedSlots, onChange, resourceId }: Int
 
   const selectedDayRestricted = isSelectedDayRestricted();
 
+  const allDaysUnavailable =
+    availabilityReady != null && days.every((d) => !isDaySelectable(d, availabilityReady));
+
+  const noOpenSlotsThisDay =
+    !selectedDayRestricted &&
+    availabilityReady != null &&
+    slotMinutes.every((m) => isSlotInPast(m));
+
+  const dayStripClass =
+    variant === "booking"
+      ? "flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      : "flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] md:max-h-[min(24rem,55vh)] md:w-[5.75rem] md:shrink-0 md:flex-col md:overflow-y-auto md:overflow-x-visible md:pr-1 [&::-webkit-scrollbar]:hidden";
+
+  const timeHintClass =
+    variant === "booking" ? "text-xs font-medium text-white/50" : "text-xs font-medium text-zinc-600";
+
+  const durationLabelClass =
+    variant === "booking"
+      ? "text-[11px] font-medium uppercase tracking-wide text-white/45"
+      : "text-[11px] font-medium uppercase tracking-wide text-zinc-500";
+
   return (
-    <div className="flex flex-col gap-5 md:flex-row md:items-stretch md:gap-6">
-      {/* Date column / mobile: horizontal strip */}
-      <div
-        className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] md:max-h-[min(24rem,55vh)] md:w-[5.75rem] md:shrink-0 md:flex-col md:overflow-y-auto md:overflow-x-visible md:pr-1 [&::-webkit-scrollbar]:hidden"
-        aria-label="Choose a day"
-      >
+    <div
+      className={
+        variant === "booking"
+          ? "flex flex-col gap-5"
+          : "flex flex-col gap-5 md:flex-row md:items-stretch md:gap-6"
+      }
+    >
+      <div className={dayStripClass} aria-label="Choose a day">
         {days.map((d) => {
           const active = calendarDayKey(d) === selectedDateKey;
           const wk = new Intl.DateTimeFormat("en-ZA", { weekday: "short" }).format(d);
@@ -284,6 +315,93 @@ export function InterviewSlotPicker({ selectedSlots, onChange, resourceId }: Int
             : before && fromLabel
               ? `Available from ${fromLabel}`
               : undefined;
+
+          const bookingBase =
+            "flex min-w-[4.75rem] shrink-0 flex-col items-center rounded-xl border px-2.5 py-2.5 text-center transition";
+          const defaultBase =
+            "flex min-w-[4.75rem] shrink-0 flex-col items-center rounded-xl border px-2.5 py-2.5 text-center transition md:min-w-0 md:px-2";
+
+          const bookingUnavailable = blocked
+            ? "cursor-not-allowed border-white/10 bg-white/[0.03] opacity-50"
+            : "cursor-not-allowed border-white/10 bg-white/[0.03] opacity-40";
+          const defaultUnavailable = blocked
+            ? "cursor-not-allowed border-red-200/90 bg-red-50/50 opacity-90"
+            : "cursor-not-allowed border-zinc-200/60 bg-zinc-50/80 opacity-45";
+
+          const bookingActive =
+            "border-[#ff6a00]/55 bg-[#ff6a00]/12 ring-1 ring-[#ff6a00]/35 shadow-[0_0_20px_rgba(255,106,0,0.12)]";
+          const defaultActive =
+            "border-orange-400/90 bg-orange-50 shadow-sm shadow-orange-950/5 ring-2 ring-orange-400/70";
+
+          const bookingIdle = "border-white/10 bg-white/[0.04] hover:border-white/20 hover:bg-white/[0.07]";
+          const defaultIdle = "border-zinc-200/90 bg-white hover:border-zinc-300 hover:bg-zinc-50/80";
+
+          const dayBtnClass =
+            variant === "booking"
+              ? `${bookingBase} ${
+                  unavailable
+                    ? bookingUnavailable
+                    : active
+                      ? bookingActive
+                      : bookingIdle
+                }`
+              : `${defaultBase} ${
+                  unavailable
+                    ? defaultUnavailable
+                    : active
+                      ? defaultActive
+                      : defaultIdle
+                }`;
+
+          const wkClass =
+            variant === "booking"
+              ? unavailable
+                ? blocked
+                  ? "text-white/35"
+                  : "text-white/30"
+                : active
+                  ? "text-[#ff6a00]"
+                  : "text-white/50"
+              : unavailable
+                ? blocked
+                  ? "text-red-800/90"
+                  : "text-zinc-400"
+                : active
+                  ? "text-orange-800"
+                  : "text-zinc-500";
+
+          const dayNumClass =
+            variant === "booking"
+              ? unavailable
+                ? "text-white/35"
+                : active
+                  ? "text-white"
+                  : "text-white/85"
+              : unavailable
+                ? blocked
+                  ? "text-red-950"
+                  : "text-zinc-500"
+                : active
+                  ? "text-zinc-950"
+                  : "text-zinc-800";
+
+          const monClass =
+            variant === "booking"
+              ? unavailable
+                ? blocked
+                  ? "text-white/35"
+                  : "text-white/28"
+                : active
+                  ? "text-white/70"
+                  : "text-white/50"
+              : unavailable
+                ? blocked
+                  ? "text-red-800/80"
+                  : "text-zinc-400"
+                : active
+                  ? "text-orange-900/90"
+                  : "text-zinc-600";
+
           return (
             <button
               key={calendarDayKey(d)}
@@ -295,61 +413,30 @@ export function InterviewSlotPicker({ selectedSlots, onChange, resourceId }: Int
                 if (unavailable) return;
                 setSelectedDate(d);
               }}
-              className={`flex min-w-[4.75rem] shrink-0 flex-col items-center rounded-xl border px-2.5 py-2.5 text-center transition md:min-w-0 md:px-2 ${
-                unavailable
-                  ? blocked
-                    ? "cursor-not-allowed border-red-200/90 bg-red-50/50 opacity-90"
-                    : "cursor-not-allowed border-zinc-200/60 bg-zinc-50/80 opacity-45"
-                  : active
-                    ? "border-orange-400/90 bg-orange-50 shadow-sm shadow-orange-950/5 ring-2 ring-orange-400/70"
-                    : "border-zinc-200/90 bg-white hover:border-zinc-300 hover:bg-zinc-50/80"
-              }`}
+              className={dayBtnClass}
             >
-              <span
-                className={`text-[10px] font-semibold uppercase tracking-wide ${
-                  unavailable
-                    ? blocked
-                      ? "text-red-800/90"
-                      : "text-zinc-400"
-                    : active
-                      ? "text-orange-800"
-                      : "text-zinc-500"
-                }`}
-              >
-                {wk}
-              </span>
-              <span
-                className={`mt-0.5 text-lg font-semibold tabular-nums ${
-                  unavailable ? (blocked ? "text-red-950" : "text-zinc-500") : active ? "text-zinc-950" : "text-zinc-800"
-                }`}
-              >
-                {d.getDate()}
-              </span>
-              <span
-                className={`text-[11px] font-medium ${
-                  unavailable
-                    ? blocked
-                      ? "text-red-800/80"
-                      : "text-zinc-400"
-                    : active
-                      ? "text-orange-900/90"
-                      : "text-zinc-600"
-                }`}
-              >
-                {mon}
-              </span>
+              <span className={`text-[10px] font-semibold uppercase tracking-wide ${wkClass}`}>{wk}</span>
+              <span className={`mt-0.5 text-lg font-semibold tabular-nums ${dayNumClass}`}>{d.getDate()}</span>
+              <span className={`text-[11px] font-medium ${monClass}`}>{mon}</span>
             </button>
           );
         })}
       </div>
 
-      {/* Time rail */}
       <div className="flex min-w-0 flex-1 flex-col gap-3">
-        <p className="text-xs font-medium text-zinc-600">
-          Times in your timezone · scroll to see slots until 20:00
+        {variant === "booking" && allDaysUnavailable ? (
+          <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white/65">
+            This talent has limited availability. Try another day.
+          </p>
+        ) : null}
+
+        <p className={timeHintClass}>
+          {variant === "booking"
+            ? "Times use your device timezone · up to 3 slots"
+            : "Times in your timezone · scroll to see slots until 20:00"}
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">Duration</span>
+          <span className={durationLabelClass}>Duration</span>
           <div className="flex gap-1.5">
             {([30, 60] as const).map((m) => {
               const active = durationMin === m;
@@ -359,11 +446,19 @@ export function InterviewSlotPicker({ selectedSlots, onChange, resourceId }: Int
                   type="button"
                   aria-pressed={active}
                   onClick={() => setDurationMin(m)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold tabular-nums transition ${
-                    active
-                      ? "border-orange-500 bg-orange-500 text-white shadow-sm shadow-orange-950/10"
-                      : "border-zinc-200/90 bg-white text-zinc-800 hover:border-orange-200 hover:bg-orange-50/50"
-                  }`}
+                  className={
+                    variant === "booking"
+                      ? `rounded-full border px-3 py-1.5 text-xs font-semibold tabular-nums transition ${
+                          active
+                            ? "border-[#ff6a00] bg-[#ff6a00] text-white shadow-sm shadow-black/30"
+                            : "border-white/12 bg-white/[0.04] text-white/75 hover:border-white/20 hover:bg-white/[0.07]"
+                        }`
+                      : `rounded-full border px-3 py-1.5 text-xs font-semibold tabular-nums transition ${
+                          active
+                            ? "border-orange-500 bg-orange-500 text-white shadow-sm shadow-orange-950/10"
+                            : "border-zinc-200/90 bg-white text-zinc-800 hover:border-orange-200 hover:bg-orange-50/50"
+                        }`
+                  }
                 >
                   {m} min
                 </button>
@@ -371,9 +466,20 @@ export function InterviewSlotPicker({ selectedSlots, onChange, resourceId }: Int
             })}
           </div>
         </div>
+
+        {variant === "booking" && noOpenSlotsThisDay && !allDaysUnavailable ? (
+          <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white/65">
+            This talent has limited availability. Try another day.
+          </p>
+        ) : null}
+
         <div
-          ref={scrollRef}
-          className="-mx-0.5 flex gap-2 overflow-x-auto overflow-y-visible px-0.5 pb-1 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:thin] md:mx-0 md:px-0"
+          ref={variant === "booking" ? undefined : scrollRef}
+          className={
+            variant === "booking"
+              ? "grid grid-cols-3 gap-2 sm:grid-cols-4"
+              : "-mx-0.5 flex gap-2 overflow-x-auto overflow-y-visible px-0.5 pb-1 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:thin] md:mx-0 md:px-0"
+          }
         >
           {slotMinutes.map((m) => {
             const past = isSlotInPast(m);
@@ -387,11 +493,19 @@ export function InterviewSlotPicker({ selectedSlots, onChange, resourceId }: Int
                 aria-pressed={selected}
                 disabled={past || restricted}
                 onClick={() => toggleSlot(m)}
-                className={`shrink-0 rounded-xl border px-3 py-2.5 text-sm font-semibold tabular-nums transition disabled:cursor-not-allowed disabled:opacity-35 ${
-                  selected
-                    ? "border-orange-500 bg-orange-500 text-white shadow-md shadow-orange-950/15"
-                    : "border-zinc-200/90 bg-white text-zinc-800 hover:border-orange-200 hover:bg-orange-50/40"
-                }`}
+                className={
+                  variant === "booking"
+                    ? `min-h-[2.75rem] rounded-xl border px-2 py-2 text-sm font-semibold tabular-nums transition disabled:cursor-not-allowed disabled:opacity-30 ${
+                        selected
+                          ? "border-[#ff6a00] bg-[#ff6a00] text-white shadow-md shadow-black/25"
+                          : "border-white/12 bg-white/[0.04] text-white/85 hover:border-white/22 hover:bg-white/[0.07]"
+                      }`
+                    : `shrink-0 rounded-xl border px-3 py-2.5 text-sm font-semibold tabular-nums transition disabled:cursor-not-allowed disabled:opacity-35 ${
+                        selected
+                          ? "border-orange-500 bg-orange-500 text-white shadow-md shadow-orange-950/15"
+                          : "border-zinc-200/90 bg-white text-zinc-800 hover:border-orange-200 hover:bg-orange-50/40"
+                      }`
+                }
               >
                 {formatTime24(m)}
               </button>
@@ -399,16 +513,46 @@ export function InterviewSlotPicker({ selectedSlots, onChange, resourceId }: Int
           })}
         </div>
 
-        <div className="rounded-xl border border-zinc-200/90 bg-white/80 px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Your selections</p>
-          <ul className="mt-2 space-y-1.5 text-sm text-zinc-800">
+        <div
+          className={
+            variant === "booking"
+              ? "rounded-xl border border-white/10 bg-black/25 px-4 py-3"
+              : "rounded-xl border border-zinc-200/90 bg-white/80 px-4 py-3"
+          }
+        >
+          <p
+            className={
+              variant === "booking"
+                ? "text-xs font-semibold uppercase tracking-wide text-white/45"
+                : "text-xs font-semibold uppercase tracking-wide text-zinc-500"
+            }
+          >
+            Your selections
+          </p>
+          <ul
+            className={
+              variant === "booking" ? "mt-2 space-y-1.5 text-sm text-white/80" : "mt-2 space-y-1.5 text-sm text-zinc-800"
+            }
+          >
             {selectedSlots.length === 0 ? (
-              <li className="text-zinc-500">No times selected yet — pick up to three slots.</li>
+              <li className={variant === "booking" ? "text-white/45" : "text-zinc-500"}>
+                No times yet — pick up to three slots.
+              </li>
             ) : (
               selectedSlots.map((iso, i) => (
                 <li key={`${iso}-${i}`} className="flex gap-2">
-                  <span className="shrink-0 font-semibold text-orange-900/90">Option {i + 1}</span>
-                  <span className="text-zinc-700">{formatSlotSummary(iso, durationMin)}</span>
+                  <span
+                    className={
+                      variant === "booking"
+                        ? "shrink-0 font-semibold text-[#ff6a00]"
+                        : "shrink-0 font-semibold text-orange-900/90"
+                    }
+                  >
+                    Option {i + 1}
+                  </span>
+                  <span className={variant === "booking" ? "text-white/70" : "text-zinc-700"}>
+                    {formatSlotSummary(iso, durationMin)}
+                  </span>
                 </li>
               ))
             )}

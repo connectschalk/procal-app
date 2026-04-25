@@ -26,10 +26,10 @@ const MAX_RANGE_DAYS = 800;
 const ACCENT = "#ff6a00";
 
 const inputDark =
-  "min-w-0 rounded-xl border border-white/10 bg-zinc-900/70 px-3 py-2.5 text-sm text-zinc-100 shadow-inner shadow-black/20 outline-none transition placeholder:text-zinc-500 focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25";
+  "min-w-0 rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-zinc-100 shadow-inner shadow-black/20 outline-none transition placeholder:text-zinc-500 focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25";
 
 const subCard =
-  "rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-inner shadow-black/20 backdrop-blur-sm md:p-6";
+  "rounded-2xl border border-white/10 bg-white/5 p-6 shadow-inner shadow-black/20 backdrop-blur-sm";
 
 function localIsoFromYmd(year: number, monthIndex: number, day: number): string {
   const d = new Date(year, monthIndex, day);
@@ -132,20 +132,20 @@ function CalendarMonthGrid({ year, month, blockedByIso, todayIso, busyIso, onDay
           const isBlocked = blocked != null;
 
           const base =
-            "relative flex min-h-[2.5rem] flex-col items-center justify-center rounded-lg border text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6a00]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0f1a] disabled:cursor-wait disabled:opacity-60 sm:min-h-[3rem] sm:rounded-xl sm:text-sm";
+            "relative flex min-h-[2.5rem] flex-col items-center justify-center rounded-lg border text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6a00]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:cursor-wait disabled:opacity-60 sm:min-h-[3rem] sm:rounded-xl sm:text-sm";
 
           let cls = base;
           if (isBlocked) {
             cls += isToday
-              ? " border-[#ff6a00] bg-gradient-to-br from-orange-600 to-orange-950 text-white shadow-lg shadow-black/30 ring-2 ring-[#ff6a00]/60 ring-offset-2 ring-offset-[#0b0f1a]"
-              : " border-orange-700/50 bg-gradient-to-br from-orange-600 to-orange-950 text-white shadow-md shadow-black/25";
+              ? " border-[#ff6a00] bg-orange-950/80 text-white shadow-lg shadow-black/30 ring-2 ring-[#ff6a00]/60 ring-offset-2 ring-offset-black"
+              : " border-orange-700/50 bg-orange-950/75 text-white shadow-md shadow-black/25";
           } else if (cell.inCurrentMonth) {
             cls += isToday
-              ? " border-white/15 bg-white/[0.08] text-white ring-2 ring-[#ff6a00]/55 ring-offset-2 ring-offset-[#0b0f1a] hover:border-white/25 hover:bg-white/[0.11]"
+              ? " border-white/15 bg-white/[0.08] text-white ring-2 ring-[#ff6a00]/55 ring-offset-2 ring-offset-black hover:border-white/25 hover:bg-white/[0.11]"
               : " border-white/10 bg-white/[0.05] text-white/90 hover:border-white/18 hover:bg-white/[0.09]";
           } else {
             cls += isToday
-              ? " border-white/[0.08] bg-white/[0.03] text-white/40 ring-2 ring-[#ff6a00]/45 ring-offset-2 ring-offset-[#0b0f1a] hover:bg-white/[0.05]"
+              ? " border-white/[0.08] bg-white/[0.03] text-white/40 ring-2 ring-[#ff6a00]/45 ring-offset-2 ring-offset-black hover:bg-white/[0.05]"
               : " border-transparent bg-transparent text-white/28 hover:bg-white/[0.04] hover:text-white/42";
           }
 
@@ -215,6 +215,7 @@ async function callUpdateAvailability(
 export default function ConsultantAvailabilityPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [dashboardEmail, setDashboardEmail] = useState<string | null>(null);
+  const [talentName, setTalentName] = useState<string>("");
   const [resourceId, setResourceId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [availableFrom, setAvailableFrom] = useState("");
@@ -282,12 +283,13 @@ export default function ConsultantAvailabilityPage() {
       setNotClaimed(false);
       setCanManage(false);
       setResourceId(null);
+      setTalentName("");
       setAvailableFrom("");
       setBlockedRows([]);
 
       const { data, error: fetchError } = await supabase
         .from("resources")
-        .select("id, claimed, available_from")
+        .select("id, name, claimed, available_from")
         .ilike("contact_email", trimmed);
 
       setLoading(false);
@@ -310,7 +312,12 @@ export default function ConsultantAvailabilityPage() {
         return;
       }
 
-      const row = list[0] as { id: string; claimed: boolean | null; available_from: string | null };
+      const row = list[0] as {
+        id: string;
+        name: string | null;
+        claimed: boolean | null;
+        available_from: string | null;
+      };
       setDashboardEmail(trimmed);
 
       if (row.claimed !== true) {
@@ -320,6 +327,7 @@ export default function ConsultantAvailabilityPage() {
 
       setCanManage(true);
       setResourceId(row.id);
+      setTalentName(row.name?.trim() ?? "");
       const now = new Date();
       setVisibleMonth({ year: now.getFullYear(), month: now.getMonth() });
       const af = row.available_from;
@@ -500,30 +508,29 @@ export default function ConsultantAvailabilityPage() {
         </div>
         <div className="pointer-events-none fixed inset-0 z-[1] bg-black/50 backdrop-blur-sm" aria-hidden />
 
-        <main className="relative z-[2] mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 py-8 pb-16 sm:px-6 sm:py-10 md:pb-20">
-          <div className="w-full rounded-3xl border border-white/10 bg-[#0b0f1a]/90 p-5 shadow-2xl shadow-black/50 backdrop-blur-xl sm:p-8 md:p-10">
-            <header className="flex flex-col gap-4 border-b border-white/10 pb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-              <div className="min-w-0 space-y-2">
+        <main className="availability-page relative z-[2] mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-8 pb-16 md:pb-20">
+          <div className="w-full rounded-3xl border border-white/10 bg-black/75 p-6 shadow-2xl shadow-black/50 backdrop-blur-xl md:p-8">
+            <header className="flex flex-col gap-3 border-b border-white/10 pb-5 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
+              <div className="min-w-0 space-y-1.5">
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-[#ff6a00] sm:text-[11px]">
                   ProCal · Talent
                 </p>
-                <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">Set your availability</h1>
-                <p className="max-w-xl text-sm leading-relaxed text-white/55">
+                <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
+                  {talentName !== "" ? `Set your availability - ${talentName}` : "Set your availability"}
+                </h1>
+                <p className="max-w-xl text-sm leading-relaxed text-zinc-400">
                   Manage when companies can request your time.
                 </p>
-                {dashboardEmail != null ? (
-                  <p className="text-xs text-white/40">Showing talent profile for {dashboardEmail}</p>
-                ) : null}
               </div>
               <Link
-                href="/consultant"
+                href="/talent"
                 className="shrink-0 text-sm font-medium text-white/50 transition hover:text-[#ff6a00]"
               >
-                Back to Talent Dashboard
+                ← Talent Dashboard
               </Link>
             </header>
 
-            <div className="mt-6 space-y-5">
+            <div className="mt-5 space-y-6">
               {loading ? (
                 <p className="text-sm text-white/50">Loading availability…</p>
               ) : null}
@@ -538,10 +545,10 @@ export default function ConsultantAvailabilityPage() {
                 <div className={subCard}>
                   <p className="text-sm text-white/70">No talent profile found for this email.</p>
                   <Link
-                    href="/consultant"
+                    href="/talent"
                     className="mt-4 inline-block text-sm font-medium text-[#ff6a00] hover:underline"
                   >
-                    Back to Talent Dashboard
+                    ← Talent Dashboard
                   </Link>
                 </div>
               ) : null}
@@ -561,7 +568,7 @@ export default function ConsultantAvailabilityPage() {
                     After you verify your email and claim your listing, you can set availability here.
                   </p>
                   <Link
-                    href="/consultant/claim"
+                    href="/talent/claim"
                     className="mt-5 inline-flex items-center justify-center rounded-2xl px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-105"
                     style={{ backgroundColor: ACCENT }}
                   >
@@ -572,51 +579,117 @@ export default function ConsultantAvailabilityPage() {
 
               {canManage ? (
                 <>
-                  <p className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm leading-relaxed text-white/60">
+                  <p className="max-w-3xl rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm leading-relaxed text-zinc-300">
                     Companies see your earliest available date and any blocked full days. Interview requests can still
                     be reviewed manually.
                   </p>
 
-                  <section className={subCard}>
-                    <h2 className="text-sm font-semibold text-white">Available from</h2>
-                    <p className="mt-1 text-xs text-white/50">
-                      Set the first date you are available for new work.
-                    </p>
-                    <form
-                      onSubmit={(e) => void handleSaveAvailableFrom(e)}
-                      className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end"
-                    >
-                      <label className="flex min-w-0 flex-1 flex-col gap-2 text-sm">
-                        <span className="font-medium text-white/55">Date</span>
-                        <input
-                          type="date"
-                          value={availableFrom}
-                          onChange={(e) => setAvailableFrom(e.target.value)}
-                          className={inputDark}
-                        />
-                      </label>
-                      <button
-                        type="submit"
-                        disabled={saveFromBusy}
-                        className="inline-flex shrink-0 items-center justify-center rounded-2xl px-6 py-2.5 text-sm font-semibold text-white shadow-md transition hover:brightness-105 disabled:opacity-60"
-                        style={{ backgroundColor: ACCENT }}
+                  <section className="grid gap-6 md:grid-cols-2">
+                    <div className={subCard}>
+                      <h2 className="text-sm font-semibold text-white">Available from</h2>
+                      <p className="mt-1 text-xs text-zinc-400">Set the first date you are available for new work.</p>
+                      <form
+                        onSubmit={(e) => void handleSaveAvailableFrom(e)}
+                        className="mt-4 flex flex-col gap-3"
                       >
-                        {saveFromBusy ? "Saving…" : "Save"}
-                      </button>
-                    </form>
-                    <p className="mt-3 text-xs text-white/40">Leave the date empty and save to clear your start date.</p>
+                        <label className="flex min-w-0 flex-col gap-2 text-sm">
+                          <span className="font-medium text-zinc-300">Date</span>
+                          <input
+                            type="date"
+                            value={availableFrom}
+                            onChange={(e) => setAvailableFrom(e.target.value)}
+                            className={inputDark}
+                          />
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="submit"
+                            disabled={saveFromBusy}
+                            className="inline-flex min-h-10 items-center justify-center rounded-2xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:brightness-105 disabled:opacity-60"
+                            style={{ backgroundColor: ACCENT }}
+                          >
+                            {saveFromBusy ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAvailableFrom("")}
+                            className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/15 bg-black/25 px-4 py-2.5 text-sm font-semibold text-white/80 transition hover:bg-black/40"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </form>
+                      <p className="mt-3 text-xs text-zinc-500">Leave the date empty and save to clear your start date.</p>
+                    </div>
+
+                    <div className={subCard}>
+                      <h2 className="text-sm font-semibold text-white">Block a date range</h2>
+                      <p className="mt-1 text-xs text-zinc-400">
+                        Use this for leave, confirmed work, or unavailable periods.
+                      </p>
+                      <form onSubmit={(e) => void handleRangeBlock(e)} className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <label className="flex flex-col gap-2 text-sm">
+                          <span className="font-medium text-zinc-300">Start date</span>
+                          <input
+                            required
+                            type="date"
+                            value={rangeStart}
+                            onChange={(e) => {
+                              setRangeFieldError(null);
+                              setRangeStart(e.target.value);
+                            }}
+                            className={inputDark}
+                          />
+                        </label>
+                        <label className="flex flex-col gap-2 text-sm">
+                          <span className="font-medium text-zinc-300">End date (optional)</span>
+                          <input
+                            type="date"
+                            value={rangeEnd}
+                            onChange={(e) => {
+                              setRangeFieldError(null);
+                              setRangeEnd(e.target.value);
+                            }}
+                            className={inputDark}
+                          />
+                        </label>
+                        <label className="flex flex-col gap-2 text-sm md:col-span-2">
+                          <span className="font-medium text-zinc-300">Reason (optional)</span>
+                          <input
+                            type="text"
+                            value={rangeReason}
+                            onChange={(e) => setRangeReason(e.target.value)}
+                            placeholder="e.g. Annual leave"
+                            className={inputDark}
+                          />
+                        </label>
+                        <div className="md:col-span-2">
+                          <button
+                            type="submit"
+                            disabled={rangeBusy}
+                            className="inline-flex min-h-10 items-center justify-center rounded-2xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:brightness-105 disabled:opacity-60"
+                            style={{ backgroundColor: ACCENT }}
+                          >
+                            {rangeBusy ? "Blocking…" : "Block range"}
+                          </button>
+                        </div>
+                      </form>
+                      {rangeFieldError ? (
+                        <p className="mt-3 text-sm text-red-300/95" role="alert">
+                          {rangeFieldError}
+                        </p>
+                      ) : null}
+                    </div>
                   </section>
 
                   <section className={subCard}>
-                    <h2 className="text-base font-semibold text-white">Blocked days</h2>
-                    <p className="mt-1 text-xs text-white/50">
-                      Tap dates on the calendar to block or unblock full days. Optional range blocking for longer
-                      stretches.
+                    <h2 className="text-base font-semibold text-white">Calendar</h2>
+                    <p className="mt-1 text-xs text-zinc-400">
+                      Click a day to mark it unavailable or available again.
                     </p>
-
-                    <label className="mt-5 flex flex-col gap-2 text-sm">
-                      <span className="font-medium text-white/70">Default reason</span>
-                      <span className="text-xs font-normal text-white/45">
+                    <label className="mt-4 flex flex-col gap-2 text-sm">
+                      <span className="font-medium text-zinc-300">Default reason</span>
+                      <span className="text-xs font-normal text-zinc-500">
                         Applied when you block a day from the calendar. Leave empty to store no reason.
                       </span>
                       <input
@@ -628,7 +701,7 @@ export default function ConsultantAvailabilityPage() {
                       />
                     </label>
 
-                    <div className="mt-6 overflow-x-auto rounded-2xl border border-white/10 bg-black/35 p-3 sm:p-5">
+                    <div className="mt-5 overflow-x-auto rounded-2xl border border-white/10 bg-black/35 p-3 sm:p-5">
                       <div className="flex min-w-[min(100%,18rem)] flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
                         <button
                           type="button"
@@ -638,7 +711,7 @@ export default function ConsultantAvailabilityPage() {
                               return { year: d.getFullYear(), month: d.getMonth() };
                             })
                           }
-                          className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/75 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                          className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-zinc-200 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
                         >
                           ← Previous
                         </button>
@@ -655,14 +728,14 @@ export default function ConsultantAvailabilityPage() {
                               return { year: d.getFullYear(), month: d.getMonth() };
                             })
                           }
-                          className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/75 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                          className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-zinc-200 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
                         >
                           Next →
                         </button>
                       </div>
                       <div className="pt-4">
                         {dataLoading ? (
-                          <p className="py-12 text-center text-sm text-white/45">Loading calendar…</p>
+                          <p className="py-12 text-center text-sm text-zinc-400">Loading calendar…</p>
                         ) : (
                           <CalendarMonthGrid
                             year={visibleMonth.year}
@@ -675,104 +748,37 @@ export default function ConsultantAvailabilityPage() {
                         )}
                       </div>
                     </div>
+                  </section>
 
-                    <div className={`${subCard} mt-6 border-white/[0.08] bg-black/25`}>
-                      <h3 className="text-sm font-semibold text-white">Block a date range</h3>
-                      <p className="mt-1 text-xs text-white/50">
-                        Use this for leave, confirmed work, or unavailable periods.
-                      </p>
-                      <p className="mt-2 text-xs text-white/40">
-                        Start date is required. Leave end empty to block only that day. Duplicates are skipped.
-                      </p>
-                      <form
-                        onSubmit={(e) => void handleRangeBlock(e)}
-                        className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2"
-                      >
-                        <label className="flex flex-col gap-2 text-sm">
-                          <span className="font-medium text-white/70">Start date</span>
-                          <input
-                            required
-                            type="date"
-                            value={rangeStart}
-                            onChange={(e) => {
-                              setRangeFieldError(null);
-                              setRangeStart(e.target.value);
-                            }}
-                            className={inputDark}
-                          />
-                        </label>
-                        <label className="flex flex-col gap-2 text-sm">
-                          <span className="font-medium text-white/70">End date (optional)</span>
-                          <input
-                            type="date"
-                            value={rangeEnd}
-                            onChange={(e) => {
-                              setRangeFieldError(null);
-                              setRangeEnd(e.target.value);
-                            }}
-                            className={inputDark}
-                          />
-                        </label>
-                        <label className="flex flex-col gap-2 text-sm sm:col-span-2">
-                          <span className="font-medium text-white/70">Reason (optional)</span>
-                          <input
-                            type="text"
-                            value={rangeReason}
-                            onChange={(e) => setRangeReason(e.target.value)}
-                            placeholder="e.g. Annual leave"
-                            className={inputDark}
-                          />
-                        </label>
-                        <div className="sm:col-span-2">
-                          <button
-                            type="submit"
-                            disabled={rangeBusy}
-                            className="inline-flex items-center justify-center rounded-2xl px-6 py-2.5 text-sm font-semibold text-white shadow-md transition hover:brightness-105 disabled:opacity-60"
-                            style={{ backgroundColor: ACCENT }}
+                  <section className={subCard}>
+                    <h2 className="text-base font-semibold text-white">Blocked dates</h2>
+                    {dataLoading ? (
+                      <p className="mt-3 text-sm text-zinc-400">Loading…</p>
+                    ) : blockedRows.length === 0 ? (
+                      <p className="mt-3 text-sm text-zinc-400">No blocked days yet.</p>
+                    ) : (
+                      <ul className="mt-3 flex flex-col gap-2">
+                        {blockedRows.map((r) => (
+                          <li
+                            key={r.id}
+                            className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                           >
-                            {rangeBusy ? "Blocking…" : "Block date range"}
-                          </button>
-                        </div>
-                      </form>
-                      {rangeFieldError ? (
-                        <p className="mt-3 text-sm text-red-300/95" role="alert">
-                          {rangeFieldError}
-                        </p>
-                      ) : null}
-                    </div>
-
-                    <div className="mt-8 border-t border-white/10 pt-6">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-white/45">Blocked dates</h3>
-                      {dataLoading ? (
-                        <p className="mt-3 text-sm text-white/45">Loading…</p>
-                      ) : blockedRows.length === 0 ? (
-                        <p className="mt-3 text-sm text-white/50">No blocked days yet.</p>
-                      ) : (
-                        <ul className="mt-3 flex flex-col gap-2">
-                          {blockedRows.map((r) => (
-                            <li
-                              key={r.id}
-                              className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                            <div>
+                              <p className="text-sm font-medium text-white">{formatDate(r.blocked_date)}</p>
+                              {r.reason?.trim() ? <p className="mt-0.5 text-xs text-zinc-400">{r.reason.trim()}</p> : null}
+                            </div>
+                            <button
+                              type="button"
+                              disabled={deleteBusyId === r.id}
+                              onClick={() => void handleDeleteBlocked(r.id)}
+                              className="self-start rounded-xl border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-red-500/40 hover:bg-red-950/30 hover:text-red-200 disabled:opacity-50 sm:self-center"
                             >
-                              <div>
-                                <p className="text-sm font-medium text-white">{formatDate(r.blocked_date)}</p>
-                                {r.reason?.trim() ? (
-                                  <p className="mt-0.5 text-xs text-white/50">{r.reason.trim()}</p>
-                                ) : null}
-                              </div>
-                              <button
-                                type="button"
-                                disabled={deleteBusyId === r.id}
-                                onClick={() => void handleDeleteBlocked(r.id)}
-                                className="self-start rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-white/55 transition hover:border-red-500/40 hover:bg-red-950/35 hover:text-red-200 disabled:opacity-50 sm:self-center"
-                              >
-                                {deleteBusyId === r.id ? "Removing…" : "Remove"}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
+                              {deleteBusyId === r.id ? "Removing…" : "Remove"}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </section>
                 </>
               ) : null}
@@ -780,6 +786,16 @@ export default function ConsultantAvailabilityPage() {
           </div>
         </main>
       </div>
+      <style jsx>{`
+        .availability-page :global(input[type="date"]::-webkit-calendar-picker-indicator) {
+          filter: invert(1);
+          opacity: 0.75;
+          cursor: pointer;
+        }
+        .availability-page :global(input[type="date"]::-webkit-calendar-picker-indicator:hover) {
+          opacity: 0.95;
+        }
+      `}</style>
     </>
   );
 }

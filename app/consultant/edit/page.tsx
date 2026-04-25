@@ -13,9 +13,9 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
-  type ReactNode,
 } from "react";
 
 const ACCENT = "#ff6a00";
@@ -28,6 +28,11 @@ const inputClass =
   "min-w-0 rounded-xl border border-white/10 bg-zinc-900/70 px-4 py-3 text-sm text-zinc-100 shadow-inner shadow-black/20 outline-none transition placeholder:text-zinc-500 focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25";
 
 type TalentDocType = "cv" | "id_front" | "id_back";
+type ProgressStep = {
+  key: "profile" | "avatar" | "photo" | "cv" | "id_front" | "id_back" | "availability";
+  label: string;
+  done: boolean;
+};
 
 function AvatarCirclePreview({ option, selected }: { option: TalentAvatarOption; selected: boolean }) {
   return (
@@ -39,20 +44,13 @@ function AvatarCirclePreview({ option, selected }: { option: TalentAvatarOption;
       }`}
       title={option.label}
     >
-      <span className="select-none text-2xl leading-none">{option.emojiPrimary}</span>
-      <span className="select-none text-base leading-none">{option.emojiSecondary}</span>
+      {/* eslint-disable-next-line @next/next/no-img-element -- static stand-in avatar thumbnails */}
+      <img
+        src={option.imagePath}
+        alt={option.label}
+        className="h-full w-full rounded-full object-cover"
+      />
     </div>
-  );
-}
-
-function OnboardingChecklistRow({ done, children }: { done: boolean; children: ReactNode }) {
-  return (
-    <li className="flex items-start gap-2 text-sm text-white/80">
-      <span className={done ? "mt-0.5 text-emerald-400" : "mt-0.5 text-amber-200"} aria-hidden>
-        {done ? "✓" : "○"}
-      </span>
-      <span>{children}</span>
-    </li>
   );
 }
 
@@ -72,8 +70,8 @@ function PublicAvatarPreviewLarge({ option }: { option: TalentAvatarOption | nul
       className="flex h-[120px] w-[120px] flex-col items-center justify-center gap-0.5 rounded-full border border-white/10 bg-gradient-to-br from-zinc-600/80 via-zinc-800 to-zinc-950 shadow-inner md:h-[140px] md:w-[140px]"
       title={option.label}
     >
-      <span className="select-none text-[2.5rem] leading-none md:text-[2.85rem]">{option.emojiPrimary}</span>
-      <span className="select-none text-[1.2rem] leading-none md:text-[1.35rem]">{option.emojiSecondary}</span>
+      {/* eslint-disable-next-line @next/next/no-img-element -- static stand-in avatar preview */}
+      <img src={option.imagePath} alt={option.label} className="h-full w-full rounded-full object-cover" />
     </div>
   );
 }
@@ -88,7 +86,9 @@ export default function ConsultantEditProfilePage() {
   const [ambiguous, setAmbiguous] = useState(false);
   const [notClaimed, setNotClaimed] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
+  const [resourceId, setResourceId] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [profileJustCreated, setProfileJustCreated] = useState(false);
 
   const [name, setName] = useState("");
   const [headline, setHeadline] = useState("");
@@ -100,23 +100,58 @@ export default function ConsultantEditProfilePage() {
   const [photoSignedUrl, setPhotoSignedUrl] = useState<string | null>(null);
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
+  const [photoUploadError, setPhotoUploadError] = useState<string | null>(null);
+  const [docUploadError, setDocUploadError] = useState<string | null>(null);
   const [cvPath, setCvPath] = useState<string | null>(null);
   const [idFrontPath, setIdFrontPath] = useState<string | null>(null);
   const [idBackPath, setIdBackPath] = useState<string | null>(null);
   const [availableFrom, setAvailableFrom] = useState<string | null>(null);
   const [docUploading, setDocUploading] = useState<TalentDocType | null>(null);
+  const [showCreateChecklist, setShowCreateChecklist] = useState(false);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [blockedDatesCount, setBlockedDatesCount] = useState(0);
+  const createChecklistRef = useRef<HTMLDivElement | null>(null);
+  const docsSectionRef = useRef<HTMLDivElement | null>(null);
+  const cvRowRef = useRef<HTMLLIElement | null>(null);
+  const idFrontRowRef = useRef<HTMLLIElement | null>(null);
+  const idBackRowRef = useRef<HTMLLIElement | null>(null);
 
   const selectedAvatarOption = useMemo(() => getTalentAvatarOptionByKey(avatarKey), [avatarKey]);
 
-  const { onboardingIncomplete, documentsIncomplete, checklist } = useMemo(() => {
+  const isCreateMode = !loading && noProfile && !ambiguous && dashboardEmail != null;
+
+  const createModeMissingItems = useMemo(() => {
+    if (!isCreateMode) return [];
+    const missing: string[] = [];
+    if (name.trim() === "") missing.push("Name");
+    if (headline.trim() === "") missing.push("Headline");
+    if (bio.trim() === "") missing.push("Bio");
+    const rateTrim = hourlyRate.trim();
+    if (rateTrim === "") {
+      missing.push("Hourly rate");
+    } else {
+      const n = Number(rateTrim);
+      if (!Number.isFinite(n) || n < 0) missing.push("Hourly rate (must be a valid non-negative number)");
+    }
+    if (location.trim() === "") missing.push("Location");
+    if (avatarKey == null || avatarKey.trim() === "") missing.push("Avatar");
+    return missing;
+  }, [isCreateMode, name, headline, bio, hourlyRate, location, avatarKey]);
+
+  const { documentsIncomplete, checklist } = useMemo(() => {
     const profileDetailsComplete =
-      name.trim().length > 0 && headline.trim().length > 0 && bio.trim().length > 0;
+      name.trim().length > 0 &&
+      headline.trim().length > 0 &&
+      bio.trim().length > 0 &&
+      hourlyRate.trim().length > 0 &&
+      location.trim().length > 0;
     const publicAvatarComplete = Boolean(avatarKey && avatarKey.trim().length > 0);
+    const photoComplete = Boolean(profilePhotoPath && profilePhotoPath.trim().length > 0);
     const cvComplete = Boolean(cvPath && cvPath.trim().length > 0);
     const idFrontComplete = Boolean(idFrontPath && idFrontPath.trim().length > 0);
     const idBackComplete = Boolean(idBackPath && idBackPath.trim().length > 0);
     const availabilityComplete =
-      availableFrom != null && String(availableFrom).trim().length > 0;
+      (availableFrom != null && String(availableFrom).trim().length > 0) || blockedDatesCount > 0;
     const documentsComplete = cvComplete && idFrontComplete && idBackComplete;
     return {
       onboardingIncomplete: !(
@@ -129,13 +164,28 @@ export default function ConsultantEditProfilePage() {
       checklist: {
         profileDetailsComplete,
         publicAvatarComplete,
+        photoComplete,
         cvComplete,
         idFrontComplete,
         idBackComplete,
         availabilityComplete,
       },
     };
-  }, [name, headline, bio, avatarKey, cvPath, idFrontPath, idBackPath, availableFrom]);
+  }, [name, headline, bio, hourlyRate, location, avatarKey, profilePhotoPath, cvPath, idFrontPath, idBackPath, availableFrom, blockedDatesCount]);
+
+  const progressSteps = useMemo<ProgressStep[]>(
+    () => [
+      { key: "profile", label: "Profile", done: checklist.profileDetailsComplete },
+      { key: "avatar", label: "Avatar", done: checklist.publicAvatarComplete },
+      { key: "photo", label: "Photo", done: checklist.photoComplete },
+      { key: "cv", label: "CV", done: checklist.cvComplete },
+      { key: "id_front", label: "ID front", done: checklist.idFrontComplete },
+      { key: "id_back", label: "ID back", done: checklist.idBackComplete },
+      { key: "availability", label: "Availability", done: checklist.availabilityComplete },
+    ],
+    [checklist],
+  );
+  const nextStepIndex = progressSteps.findIndex((s) => !s.done);
 
   const loadProfile = useCallback(async (trimmed: string) => {
     setDashboardEmail(trimmed);
@@ -145,8 +195,12 @@ export default function ConsultantEditProfilePage() {
     setAmbiguous(false);
     setNotClaimed(false);
     setCanEdit(false);
+    setResourceId(null);
     setSuccess(false);
+    setProfileJustCreated(false);
+    setSaveModalOpen(false);
     setPhotoSignedUrl(null);
+    setBlockedDatesCount(0);
 
     const { data, error: fetchError } = await supabase
       .from("resources")
@@ -167,6 +221,10 @@ export default function ConsultantEditProfilePage() {
     if (rows.length === 0) {
       setNoProfile(true);
       setDashboardEmail(trimmed);
+      const defaultAvatar = TALENT_AVATAR_OPTIONS[0]?.key ?? null;
+      if (defaultAvatar != null) {
+        setAvatarKey((prev) => prev ?? defaultAvatar);
+      }
       return;
     }
     if (rows.length > 1) {
@@ -199,6 +257,7 @@ export default function ConsultantEditProfilePage() {
     }
 
     setCanEdit(true);
+    setResourceId(row.id);
     setName((row.name as string | null) ?? "");
     setHeadline((row.headline as string | null) ?? "");
     setBio((row.bio as string | null) ?? "");
@@ -211,6 +270,12 @@ export default function ConsultantEditProfilePage() {
     setCvPath(row.cv_document_path ?? null);
     setIdFrontPath(row.id_front_document_path ?? null);
     setIdBackPath(row.id_back_document_path ?? null);
+
+    const { count } = await supabase
+      .from("resource_blocked_dates")
+      .select("id", { count: "exact", head: true })
+      .eq("resource_id", row.id);
+    setBlockedDatesCount(count ?? 0);
   }, [supabase]);
 
   useEffect(() => {
@@ -319,12 +384,72 @@ export default function ConsultantEditProfilePage() {
     if (!dashboardEmail?.trim()) return;
     setError(null);
     setSuccess(false);
+    setProfileJustCreated(false);
+    setShowCreateChecklist(false);
     setSubmitting(true);
+
+    const creating = noProfile && !ambiguous;
+
+    if (creating) {
+      if (createModeMissingItems.length > 0) {
+        setShowCreateChecklist(true);
+        setSubmitting(false);
+        startTransition(() => {
+          createChecklistRef.current?.focus();
+          createChecklistRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+        return;
+      }
+
+      const rateTrim = hourlyRate.trim();
+      const n = Number(rateTrim);
+      if (!Number.isFinite(n) || n < 0) {
+        setError("Hourly rate must be a valid non-negative number.");
+        setSubmitting(false);
+        return;
+      }
+      const hourly_rate = n;
+
+      const res = await fetch("/api/create-talent-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          headline: headline.trim(),
+          bio: bio.trim(),
+          hourly_rate,
+          location: location.trim(),
+          avatar_key: avatarKey,
+        }),
+      });
+      const raw = await res.text();
+      let data: { success?: boolean; error?: string; resourceId?: string } = {};
+      try {
+        data = raw ? (JSON.parse(raw) as typeof data) : {};
+      } catch {
+        /* ignore */
+      }
+      if (!res.ok || data.success !== true) {
+        setSubmitting(false);
+        setError(typeof data.error === "string" && data.error.trim() !== "" ? data.error : "Could not create profile");
+        return;
+      }
+      if (typeof data.resourceId === "string") {
+        setResourceId(data.resourceId);
+      }
+      await loadProfile(dashboardEmail.trim());
+      setSubmitting(false);
+      setProfileJustCreated(true);
+      setSuccess(true);
+      setSaveModalOpen(true);
+      return;
+    }
 
     const ok = await persistProfile();
     setSubmitting(false);
     if (!ok) return;
     setSuccess(true);
+    setSaveModalOpen(true);
   }
 
   async function handleRemoveUploadedPhoto() {
@@ -339,8 +464,9 @@ export default function ConsultantEditProfilePage() {
   }
 
   async function handlePhotoSelected(file: File | null) {
-    if (file == null || !dashboardEmail?.trim()) return;
+    if (!canEdit || file == null || !dashboardEmail?.trim()) return;
     setError(null);
+    setPhotoUploadError(null);
     setUploadBusy(true);
     const fd = new FormData();
     fd.append("email", dashboardEmail.trim());
@@ -355,7 +481,14 @@ export default function ConsultantEditProfilePage() {
     }
     setUploadBusy(false);
     if (!res.ok || data.success !== true) {
-      setError(typeof data.error === "string" && data.error.trim() !== "" ? data.error : "Upload failed");
+      const fallback = typeof data.error === "string" && data.error.trim() !== "" ? data.error : "Upload failed";
+      if (fallback.includes("talent-profile-photos")) {
+        setPhotoUploadError(
+          "Profile photo storage is not ready. Create a private Supabase Storage bucket named talent-profile-photos, then try again.",
+        );
+      } else {
+        setPhotoUploadError(fallback);
+      }
       return;
     }
     if (typeof data.path === "string") {
@@ -364,6 +497,7 @@ export default function ConsultantEditProfilePage() {
     if (typeof data.signedUrl === "string" && data.signedUrl.length > 0) {
       setPhotoSignedUrl(data.signedUrl);
     }
+    setPhotoUploadError(null);
   }
 
   function pickAvatar(key: string) {
@@ -372,8 +506,9 @@ export default function ConsultantEditProfilePage() {
   }
 
   async function handleTalentDocumentUpload(type: TalentDocType, file: File | null) {
-    if (file == null || !dashboardEmail?.trim()) return;
+    if (!canEdit || file == null || !dashboardEmail?.trim()) return;
     setError(null);
+    setDocUploadError(null);
     setDocUploading(type);
     const fd = new FormData();
     fd.append("email", dashboardEmail.trim());
@@ -389,7 +524,14 @@ export default function ConsultantEditProfilePage() {
     }
     setDocUploading(null);
     if (!res.ok || data.success !== true) {
-      setError(typeof data.error === "string" && data.error.trim() !== "" ? data.error : "Upload failed");
+      const fallback = typeof data.error === "string" && data.error.trim() !== "" ? data.error : "Upload failed";
+      if (fallback.includes("talent-documents")) {
+        setDocUploadError(
+          "Verification document storage is not ready. Create a private Supabase Storage bucket named talent-documents, then try again.",
+        );
+      } else {
+        setDocUploadError(fallback);
+      }
       return;
     }
     if (typeof data.path === "string") {
@@ -397,6 +539,7 @@ export default function ConsultantEditProfilePage() {
       else if (type === "id_front") setIdFrontPath(data.path);
       else setIdBackPath(data.path);
     }
+    setDocUploadError(null);
   }
 
   async function openTalentDocumentView(type: TalentDocType) {
@@ -415,6 +558,16 @@ export default function ConsultantEditProfilePage() {
     }
   }
 
+  function focusUploadArea(type: TalentDocType) {
+    docsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    startTransition(() => {
+      if (type === "cv") cvRowRef.current?.focus();
+      else if (type === "id_front") idFrontRowRef.current?.focus();
+      else idBackRowRef.current?.focus();
+    });
+    setSaveModalOpen(false);
+  }
+
   return (
     <>
       <AppTopNav variant="hero" />
@@ -430,25 +583,85 @@ export default function ConsultantEditProfilePage() {
         </div>
 
         <main className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 md:px-10 md:pb-20 md:pt-8">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className={accentEyebrow}>Talent profile</p>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight text-white md:text-3xl">Edit your profile</h1>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight text-white md:text-3xl">
+                {name.trim().length > 0 ? `Edit your profile - ${name.trim()}` : "Edit your profile"}
+              </h1>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/60">
-                Your public profile currently shows your selected avatar. Real photo visibility will be controlled
-                later.
+                {isCreateMode ? (
+                  "Complete your profile so companies can discover and request you."
+                ) : (
+                  <>
+                    Your public profile currently shows your selected avatar. Real photo visibility will be controlled
+                    later.
+                  </>
+                )}
               </p>
             </div>
             <Link
-              href="/consultant"
+              href="/talent"
               className="text-sm font-medium text-white/60 transition hover:text-white"
             >
               ← Talent dashboard
             </Link>
           </div>
-
-          {dashboardEmail != null ? (
-            <p className="mt-4 text-xs text-white/45">Editing talent profile for {dashboardEmail}</p>
+          {(canEdit || isCreateMode) && !notClaimed ? (
+            <div className={`${glassCard} mt-4 p-4 md:p-5`}>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="w-full md:flex-1">
+                  <div className="mx-auto w-full max-w-4xl overflow-x-auto">
+                    <div className="mx-auto flex min-w-max items-start justify-center gap-2 px-1">
+                      {progressSteps.map((step, idx) => {
+                        const isNext = !step.done && idx === nextStepIndex;
+                        return (
+                          <div key={step.key} className="flex items-center gap-2">
+                            <div className="flex flex-col items-center gap-1.5">
+                              <span
+                                className={`flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold ${
+                                  step.done
+                                    ? "border-emerald-500/40 bg-emerald-950/40 text-emerald-300"
+                                    : isNext
+                                      ? "border-orange-500/40 bg-orange-950/30 text-orange-200"
+                                      : "border-white/15 bg-black/25 text-white/40"
+                                }`}
+                                aria-hidden
+                              >
+                                {step.done ? "✓" : "○"}
+                              </span>
+                              <span
+                                className={`whitespace-nowrap text-[11px] ${
+                                  step.done ? "text-emerald-300/95" : isNext ? "text-orange-200" : "text-white/55"
+                                }`}
+                              >
+                                {step.label}
+                              </span>
+                            </div>
+                            {idx < progressSteps.length - 1 ? (
+                              <span className="mb-5 block h-px w-8 bg-white/15 sm:w-10" aria-hidden />
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                {(canEdit || isCreateMode) && !success ? (
+                  <div className="flex justify-center md:justify-end">
+                    <button
+                      type="submit"
+                      form="talent-profile-form"
+                      disabled={submitting}
+                      className="inline-flex min-h-10 w-full items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:brightness-105 active:scale-[0.98] disabled:opacity-60 md:w-auto md:min-w-[132px]"
+                      style={{ backgroundColor: ACCENT }}
+                    >
+                      {submitting ? "Saving…" : "Save profile"}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
           ) : null}
 
           {loading ? <p className="mt-6 text-sm text-white/55">Loading your profile…</p> : null}
@@ -457,10 +670,6 @@ export default function ConsultantEditProfilePage() {
             <p className="mt-6 rounded-xl border border-red-500/35 bg-red-950/50 px-4 py-3 text-sm text-red-100">
               {error}
             </p>
-          ) : null}
-
-          {noProfile ? (
-            <p className={`${glassCard} mt-6 text-sm text-white/70`}>No talent profile found for this email.</p>
           ) : null}
 
           {ambiguous ? (
@@ -476,7 +685,7 @@ export default function ConsultantEditProfilePage() {
                 After you verify your email, you can return here to edit your public profile details.
               </p>
               <Link
-                href="/consultant/claim"
+                href="/talent/claim"
                 className="mt-4 inline-flex items-center justify-center rounded-2xl px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-105"
                 style={{ backgroundColor: ACCENT }}
               >
@@ -485,70 +694,93 @@ export default function ConsultantEditProfilePage() {
             </div>
           ) : null}
 
-          {canEdit && onboardingIncomplete ? (
-            <div className={`${glassCard} mt-6 border-amber-500/25 bg-amber-950/15`}>
-              <p className={accentEyebrow}>Complete setup</p>
-              <h2 className="mt-2 text-lg font-semibold text-white">Complete your Talent profile</h2>
-              <p className="mt-2 text-sm text-white/60">
-                Finish the items below so your profile is ready for verification and discovery. Private documents
-                stay off your public listing.
-              </p>
-              <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-white/50">Required</p>
-              <ul className="mt-2 space-y-2">
-                <OnboardingChecklistRow done={checklist.profileDetailsComplete}>
-                  Profile details (name, headline, bio)
-                </OnboardingChecklistRow>
-                <OnboardingChecklistRow done={checklist.publicAvatarComplete}>Public avatar</OnboardingChecklistRow>
-                <OnboardingChecklistRow done={checklist.cvComplete}>CV</OnboardingChecklistRow>
-                <OnboardingChecklistRow done={checklist.idFrontComplete}>ID front</OnboardingChecklistRow>
-                <OnboardingChecklistRow done={checklist.idBackComplete}>ID back</OnboardingChecklistRow>
-                <OnboardingChecklistRow done={checklist.availabilityComplete}>
-                  <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span>Availability</span>
-                    {!checklist.availabilityComplete ? (
-                      <Link
-                        href="/consultant/availability"
-                        className="text-xs font-semibold text-[#ff6a00] hover:underline"
-                      >
-                        Set availability →
-                      </Link>
-                    ) : null}
-                  </span>
-                </OnboardingChecklistRow>
+          {isCreateMode && showCreateChecklist && createModeMissingItems.length > 0 ? (
+            <div
+              ref={createChecklistRef}
+              tabIndex={-1}
+              className={`${glassCard} mt-6 border-amber-400/40 bg-amber-950/35 outline-none`}
+            >
+              <p className={accentEyebrow}>Action needed</p>
+              <h2 className="mt-2 text-lg font-semibold text-amber-100">
+                Complete these items before creating your Talent profile
+              </h2>
+              <ul className="mt-4 space-y-2">
+                {createModeMissingItems.map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-sm text-amber-100/95">
+                    <span className="mt-0.5 text-amber-300" aria-hidden>
+                      ⚠
+                    </span>
+                    <span>{item}</span>
+                  </li>
+                ))}
               </ul>
             </div>
           ) : null}
 
           {canEdit && success ? (
             <div className={`${glassCard} mt-6 border-emerald-500/25`}>
-              <p className="text-base font-semibold text-emerald-100">Profile updated</p>
-              {documentsIncomplete ? (
-                <p className="mt-3 rounded-xl border border-amber-500/25 bg-amber-950/25 px-3 py-2 text-sm text-amber-100/95">
-                  Your profile can be saved, but verification is incomplete until all documents are uploaded.
-                </p>
-              ) : null}
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link
-                  href="/consultant"
-                  className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500"
-                >
-                  Back to dashboard
-                </Link>
-                <Link
-                  href="/marketplace"
-                  className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-black/30 px-5 py-2.5 text-sm font-medium text-white hover:bg-black/45"
-                >
-                  View marketplace
-                </Link>
-              </div>
+              {profileJustCreated ? (
+                <>
+                  <p className="text-sm text-white/80">
+                    <span className="font-semibold text-emerald-100">Talent profile created.</span> You can now
+                    upload your photo, CV and ID documents.
+                  </p>
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <Link
+                      href="#talent-verification-documents"
+                      className="inline-flex items-center justify-center rounded-2xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:brightness-105"
+                      style={{ backgroundColor: ACCENT }}
+                    >
+                      Upload documents
+                    </Link>
+                    <Link
+                      href="/talent/availability"
+                      className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-black/30 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-black/45"
+                    >
+                      Set availability
+                    </Link>
+                    {resourceId != null ? (
+                      <Link
+                        href={`/consultants/${resourceId}`}
+                        className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-black/30 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-black/45"
+                      >
+                        View public profile
+                      </Link>
+                    ) : null}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-base font-semibold text-emerald-100">Profile updated</p>
+                  {documentsIncomplete ? (
+                    <p className="mt-3 rounded-xl border border-amber-500/25 bg-amber-950/25 px-3 py-2 text-sm text-amber-100/95">
+                      Your profile can be saved, but verification is incomplete until all documents are uploaded.
+                    </p>
+                  ) : null}
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <Link
+                      href="/talent"
+                      className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500"
+                    >
+                      Back to dashboard
+                    </Link>
+                    <Link
+                      href="/marketplace"
+                      className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-black/30 px-5 py-2.5 text-sm font-medium text-white hover:bg-black/45"
+                    >
+                      View marketplace
+                    </Link>
+                  </div>
+                </>
+              )}
             </div>
           ) : null}
 
-          {canEdit && !success ? (
+          {(canEdit || isCreateMode) && !success ? (
             <div className="mt-8 space-y-6">
               <div className={glassCard}>
                 <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
-                  <div className="flex flex-col items-center gap-4 lg:items-start">
+                  <div className="flex flex-col items-center gap-4">
                     {/* TODO: Swap emoji preview for static image assets keyed by avatar_key. */}
                     <PublicAvatarPreviewLarge option={selectedAvatarOption} />
                     <div className="flex w-full max-w-xs flex-col gap-2 sm:flex-row sm:justify-center lg:max-w-none lg:flex-col">
@@ -565,9 +797,15 @@ export default function ConsultantEditProfilePage() {
                       <p className="text-xs font-semibold uppercase tracking-wide text-[#ff6a00]">
                         Upload real photo
                       </p>
-                      <p className="mt-2 text-xs leading-relaxed text-white/55">
-                        Uploaded photo saved privately. Public photo unlock will be added later.
-                      </p>
+                      {isCreateMode ? (
+                        <p className="mt-2 text-xs leading-relaxed text-amber-100/85">
+                          You can prepare these next. Uploads unlock after your basic profile is created.
+                        </p>
+                      ) : (
+                        <p className="mt-2 text-xs leading-relaxed text-white/55">
+                          Uploaded photo saved privately. Public photo unlock will be added later.
+                        </p>
+                      )}
                       <p
                         className={`mt-3 inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs font-medium ${
                           profilePhotoPath != null && profilePhotoPath.trim() !== ""
@@ -577,12 +815,16 @@ export default function ConsultantEditProfilePage() {
                       >
                         {profilePhotoPath != null && profilePhotoPath.trim() !== "" ? "✓ Uploaded" : "Missing"}
                       </p>
-                      <label className="mt-3 inline-flex w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/20 px-3 py-2.5 text-sm font-medium text-white/80 transition hover:border-orange-500/40 hover:bg-black/35">
+                      <label
+                        className={`mt-3 inline-flex w-full items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/20 px-3 py-2.5 text-sm font-medium text-white/80 transition hover:border-orange-500/40 hover:bg-black/35 ${
+                          canEdit ? "cursor-pointer" : "pointer-events-none cursor-not-allowed opacity-45"
+                        }`}
+                      >
                         <input
                           type="file"
                           accept="image/jpeg,image/png,image/webp"
                           className="sr-only"
-                          disabled={uploadBusy}
+                          disabled={!canEdit || uploadBusy}
                           onChange={(e) => {
                             const f = e.target.files?.[0] ?? null;
                             e.target.value = "";
@@ -591,6 +833,8 @@ export default function ConsultantEditProfilePage() {
                         />
                         {uploadBusy
                           ? "Uploading…"
+                          : !canEdit
+                            ? "Available after profile is saved"
                           : profilePhotoPath != null && profilePhotoPath.trim() !== ""
                             ? "Replace photo"
                             : "Choose file"}
@@ -617,17 +861,39 @@ export default function ConsultantEditProfilePage() {
                           </button>
                         </div>
                       ) : null}
+                      {photoUploadError ? (
+                        <div className="mt-3 rounded-xl border border-red-500/30 bg-red-950/40 px-3 py-2 text-xs leading-relaxed text-red-100/95">
+                          {photoUploadError.includes("talent-profile-photos") ? (
+                            <>
+                              <p className="font-semibold text-red-100">Profile photo storage is not ready</p>
+                              <p className="mt-1 text-red-100/90">
+                                Create a private Supabase Storage bucket named talent-profile-photos, then try again.
+                              </p>
+                            </>
+                          ) : (
+                            <p>{photoUploadError}</p>
+                          )}
+                        </div>
+                      ) : null}
+                      {photoUploadError && photoUploadError.includes("talent-profile-photos") ? (
+                        <p className="mt-2 text-[11px] text-white/40">Bucket required: talent-profile-photos</p>
+                      ) : null}
                     </div>
 
                     {/* TODO: Admin verification screen should list CV/ID securely (signed URLs / service role). */}
                     {/* TODO: Tighten Storage RLS on talent-documents and resource policies before production. */}
-                    <div className="w-full max-w-xs rounded-2xl border border-white/10 bg-black/25 p-4 backdrop-blur-sm">
+                    <div
+                      id="talent-verification-documents"
+                      ref={docsSectionRef}
+                      className="w-full max-w-xs rounded-2xl border border-white/10 bg-black/25 p-4 backdrop-blur-sm"
+                    >
                       <p className="text-xs font-semibold uppercase tracking-wide text-[#ff6a00]">
                         Verification documents
                       </p>
                       <p className="mt-2 text-xs leading-relaxed text-white/55">
-                        Upload your CV and ID documents privately. These are used for verification and are not shown on
-                        your public profile.
+                        {isCreateMode
+                          ? "You can prepare these next. Uploads unlock after your basic profile is created."
+                          : "Upload your CV and ID documents privately. These are used for verification and are not shown on your public profile."}
                       </p>
                       <ul className="mt-4 space-y-4">
                         {(
@@ -655,7 +921,18 @@ export default function ConsultantEditProfilePage() {
                             },
                           ] as const
                         ).map((row) => (
-                          <li key={row.type} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                          <li
+                            key={row.type}
+                            ref={
+                              row.type === "cv"
+                                ? cvRowRef
+                                : row.type === "id_front"
+                                  ? idFrontRowRef
+                                  : idBackRowRef
+                            }
+                            tabIndex={-1}
+                            className="rounded-xl border border-white/10 bg-black/20 p-3 outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40"
+                          >
                             <div className="flex items-center justify-between gap-2">
                               <span className="text-sm font-medium text-white">Upload {row.title}</span>
                               <span
@@ -668,12 +945,16 @@ export default function ConsultantEditProfilePage() {
                                 {row.path != null && row.path.trim() !== "" ? "✓ Uploaded" : "Missing"}
                               </span>
                             </div>
-                            <label className="mt-2 inline-flex w-full cursor-pointer items-center justify-center rounded-lg border border-dashed border-white/18 bg-black/25 px-2 py-2 text-xs font-medium text-white/80 transition hover:border-orange-500/35 hover:bg-black/35">
+                            <label
+                              className={`mt-2 inline-flex w-full items-center justify-center rounded-lg border border-dashed border-white/18 bg-black/25 px-2 py-2 text-xs font-medium text-white/80 transition hover:border-orange-500/35 hover:bg-black/35 ${
+                                canEdit ? "cursor-pointer" : "pointer-events-none cursor-not-allowed opacity-45"
+                              }`}
+                            >
                               <input
                                 type="file"
                                 accept={row.accept}
                                 className="sr-only"
-                                disabled={docUploading != null}
+                                disabled={!canEdit || docUploading != null}
                                 onChange={(e) => {
                                   const f = e.target.files?.[0] ?? null;
                                   e.target.value = "";
@@ -682,6 +963,8 @@ export default function ConsultantEditProfilePage() {
                               />
                               {docUploading === row.type
                                 ? "Uploading…"
+                                : !canEdit
+                                  ? "Available after profile is saved"
                                 : row.path != null && row.path.trim() !== ""
                                   ? row.type === "cv"
                                     ? "Replace CV"
@@ -702,6 +985,23 @@ export default function ConsultantEditProfilePage() {
                           </li>
                         ))}
                       </ul>
+                      {docUploadError ? (
+                        <div className="mt-3 rounded-xl border border-red-500/30 bg-red-950/40 px-3 py-2 text-xs leading-relaxed text-red-100/95">
+                          {docUploadError.includes("talent-documents") ? (
+                            <>
+                              <p className="font-semibold text-red-100">Verification document storage is not ready</p>
+                              <p className="mt-1 text-red-100/90">
+                                Create a private Supabase Storage bucket named talent-documents, then try again.
+                              </p>
+                            </>
+                          ) : (
+                            <p>{docUploadError}</p>
+                          )}
+                        </div>
+                      ) : null}
+                      {docUploadError && docUploadError.includes("talent-documents") ? (
+                        <p className="mt-2 text-[11px] text-white/40">Bucket required: talent-documents</p>
+                      ) : null}
                     </div>
                   </div>
 
@@ -724,6 +1024,7 @@ export default function ConsultantEditProfilePage() {
                     <label className="flex flex-col gap-2 text-sm">
                       <span className="font-medium text-zinc-400">Headline</span>
                       <input
+                        required={isCreateMode}
                         type="text"
                         value={headline}
                         onChange={(e) => setHeadline(e.target.value)}
@@ -735,6 +1036,7 @@ export default function ConsultantEditProfilePage() {
                     <label className="flex flex-col gap-2 text-sm">
                       <span className="font-medium text-zinc-400">Bio</span>
                       <textarea
+                        required={isCreateMode}
                         rows={5}
                         value={bio}
                         onChange={(e) => setBio(e.target.value)}
@@ -744,8 +1046,9 @@ export default function ConsultantEditProfilePage() {
                     </label>
 
                     <label className="flex flex-col gap-2 text-sm">
-                      <span className="font-medium text-zinc-400">Hourly rate (optional)</span>
+                      <span className="font-medium text-zinc-400">Hourly rate</span>
                       <input
+                        required={isCreateMode}
                         type="text"
                         inputMode="decimal"
                         value={hourlyRate}
@@ -758,6 +1061,7 @@ export default function ConsultantEditProfilePage() {
                     <label className="flex flex-col gap-2 text-sm">
                       <span className="font-medium text-zinc-400">Location</span>
                       <input
+                        required={isCreateMode}
                         type="text"
                         value={location}
                         onChange={(e) => setLocation(e.target.value)}
@@ -772,26 +1076,21 @@ export default function ConsultantEditProfilePage() {
                       </p>
                     ) : null}
 
-                    <div className="flex flex-col gap-3 sm:flex-row">
-                      <button
-                        type="submit"
-                        disabled={submitting}
-                        className="inline-flex min-h-12 flex-1 items-center justify-center rounded-2xl px-6 text-sm font-semibold text-white shadow-md transition hover:brightness-105 disabled:opacity-60"
-                        style={{ backgroundColor: ACCENT }}
-                      >
-                        {submitting ? "Saving…" : "Save profile"}
-                      </button>
-                      <Link
-                        href="/consultant"
-                        className="inline-flex min-h-12 flex-1 items-center justify-center rounded-2xl border border-white/15 bg-black/30 px-6 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-black/45"
-                      >
-                        Cancel
-                      </Link>
-                    </div>
                   </form>
                 </div>
               </div>
 
+              <div className="flex justify-end mt-8 pb-8">
+                <button
+                  type="submit"
+                  form="talent-profile-form"
+                  disabled={submitting}
+                  className="inline-flex min-h-10 w-full items-center justify-center rounded-2xl px-5 py-2 text-sm font-semibold text-white shadow-md transition hover:brightness-105 active:scale-[0.98] disabled:opacity-60 sm:w-auto"
+                  style={{ backgroundColor: ACCENT }}
+                >
+                  {submitting ? "Saving…" : "Save profile"}
+                </button>
+              </div>
             </div>
           ) : null}
         </main>
@@ -839,6 +1138,78 @@ export default function ConsultantEditProfilePage() {
               >
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {saveModalOpen ? (
+        <div className="fixed inset-0 z-[110] flex items-end justify-center p-4 sm:items-center">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/65 backdrop-blur-sm"
+            aria-label="Close profile saved modal"
+            onClick={() => setSaveModalOpen(false)}
+          />
+          <div className="relative z-[111] w-full max-w-lg rounded-3xl border border-white/10 bg-[#0b0f1a]/95 p-5 shadow-2xl backdrop-blur-xl sm:p-6">
+            <h2 className="text-xl font-semibold text-white">Profile saved</h2>
+            <p className="mt-2 text-sm text-white/70">
+              Your basic Talent profile is saved. Complete the next steps to prepare your profile for verification.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {!checklist.cvComplete ? (
+                <button
+                  type="button"
+                  onClick={() => focusUploadArea("cv")}
+                  className="rounded-xl border border-orange-500/35 bg-orange-950/35 px-3 py-2 text-sm font-semibold text-orange-100 transition hover:brightness-110"
+                >
+                  Upload CV
+                </button>
+              ) : null}
+              {!checklist.idFrontComplete ? (
+                <button
+                  type="button"
+                  onClick={() => focusUploadArea("id_front")}
+                  className="rounded-xl border border-orange-500/35 bg-orange-950/35 px-3 py-2 text-sm font-semibold text-orange-100 transition hover:brightness-110"
+                >
+                  Upload ID front
+                </button>
+              ) : null}
+              {!checklist.idBackComplete ? (
+                <button
+                  type="button"
+                  onClick={() => focusUploadArea("id_back")}
+                  className="rounded-xl border border-orange-500/35 bg-orange-950/35 px-3 py-2 text-sm font-semibold text-orange-100 transition hover:brightness-110"
+                >
+                  Upload ID back
+                </button>
+              ) : null}
+              {!checklist.availabilityComplete ? (
+                <Link
+                  href="/talent/availability"
+                  onClick={() => setSaveModalOpen(false)}
+                  className="rounded-xl border border-orange-500/35 bg-orange-950/35 px-3 py-2 text-sm font-semibold text-orange-100 transition hover:brightness-110"
+                >
+                  Set availability
+                </Link>
+              ) : null}
+            </div>
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => setSaveModalOpen(false)}
+                className="inline-flex flex-1 items-center justify-center rounded-2xl border border-white/15 bg-black/30 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-black/45"
+              >
+                Continue editing
+              </button>
+              <Link
+                href="/talent"
+                onClick={() => setSaveModalOpen(false)}
+                className="inline-flex flex-1 items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-105"
+                style={{ backgroundColor: ACCENT }}
+              >
+                View Talent Dashboard
+              </Link>
             </div>
           </div>
         </div>

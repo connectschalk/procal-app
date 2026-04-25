@@ -88,7 +88,11 @@ export function AppTopNav({ variant = "default" }: { variant?: AppTopNavVariant 
   const marketplaceActive =
     pathname === "/marketplace" || pathname.startsWith("/consultants");
   const companyDashboardActive = pathname === "/company";
-  const talentDashboardActive = pathname === "/consultant" || pathname.startsWith("/consultant/");
+  const talentDashboardActive =
+    pathname === "/talent" ||
+    pathname.startsWith("/talent/") ||
+    pathname === "/consultant" ||
+    pathname.startsWith("/consultant/");
   const adminResourcesActive = pathname.startsWith("/admin/resources");
   const adminInterviewsActive = pathname.startsWith("/admin/interviews");
   const adminEngagementsActive = pathname.startsWith("/admin/engagements");
@@ -147,7 +151,7 @@ export function AppTopNav({ variant = "default" }: { variant?: AppTopNavVariant 
           ) : null}
 
           {authUser != null && navRole === "consultant" ? (
-            <Link href="/consultant" className={navLinkClass(talentDashboardActive, hero)}>
+            <Link href="/talent" className={navLinkClass(talentDashboardActive, hero)}>
               Talent Dashboard
             </Link>
           ) : null}

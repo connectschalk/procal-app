@@ -88,8 +88,15 @@ export default async function RequestInterviewPage({ params }: PageProps) {
                     className="flex h-[100px] w-[100px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-full border border-white/10 bg-gradient-to-br from-zinc-600/80 via-zinc-800 to-zinc-950 shadow-inner"
                     title={avatar.label}
                   >
-                    <span className="select-none text-[2.25rem] leading-none">{avatar.primary}</span>
-                    <span className="select-none text-lg leading-none">{avatar.secondary}</span>
+                    {avatar.imagePath != null ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- static stand-in avatar image
+                      <img src={avatar.imagePath} alt={avatar.label} className="h-full w-full rounded-full object-cover" />
+                    ) : (
+                      <>
+                        <span className="select-none text-[2.25rem] leading-none">{avatar.primary}</span>
+                        <span className="select-none text-lg leading-none">{avatar.secondary}</span>
+                      </>
+                    )}
                   </div>
                   <div className="min-w-0 flex-1 text-center sm:text-left">
                     <h1 className="text-xl font-bold tracking-tight text-white md:text-2xl">{consultantName}</h1>

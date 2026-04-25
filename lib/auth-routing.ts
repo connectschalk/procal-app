@@ -11,8 +11,8 @@ export type UserProfileRow = {
 
 export function dashboardPathForRole(role: string): string {
   if (role === "company") return "/company";
-  /** Talent lands on profile edit for onboarding (documents, avatar, availability). */
-  if (role === "consultant") return "/consultant/edit";
+  /** Talent lands on dashboard home. */
+  if (role === "consultant") return "/talent";
   if (role === "admin") return "/admin/resources";
   return "/";
 }
@@ -39,12 +39,17 @@ export function postLoginRedirectPath(role: string, next: string | null | undefi
   if (safe === "/marketplace") return "/marketplace";
   if (safe === "/company" && role === "company") return "/company";
   if (safe === "/requests" && role === "company") return "/company";
-  if (safe === "/create" && role === "consultant") return "/consultant/edit";
+  if (safe === "/create" && role === "consultant") return "/talent";
   if (role === "company" && safe != null && isCompanyConsultantActionPath(safe)) {
     return safe;
   }
-  if (safe === "/consultant" && role === "consultant") return "/consultant";
-  if (safe === "/consultant/edit" && role === "consultant") return "/consultant/edit";
+  if (safe === "/talent" && role === "consultant") return "/talent";
+  if (safe === "/talent/edit" && role === "consultant") return "/talent/edit";
+  if (safe === "/talent/availability" && role === "consultant") return "/talent/availability";
+  if (safe === "/consultant" && role === "consultant") return "/talent";
+  if (safe === "/consultant/edit" && role === "consultant") return "/talent/edit";
+  if (safe === "/consultant/availability" && role === "consultant") return "/talent/availability";
+  if (safe === "/consultant/claim" && role === "consultant") return "/talent/claim";
   if (
     safe != null &&
     (safe === "/admin/resources" || safe.startsWith("/admin/")) &&

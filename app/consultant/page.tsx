@@ -44,6 +44,14 @@ type EngagementProposalRow = {
 
 type InterviewStatusFilter = "all" | "requested" | "accepted" | "declined";
 type KindTab = "all" | "interviews" | "proposals";
+type OnboardingSummary = {
+  profileComplete: boolean;
+  avatarComplete: boolean;
+  photoComplete: boolean;
+  cvComplete: boolean;
+  idComplete: boolean;
+  availabilityComplete: boolean;
+};
 
 function formatSlot(value: string | null) {
   if (!value) return "—";
@@ -149,13 +157,21 @@ export default function ConsultantDashboardPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [interviewRows, setInterviewRows] = useState<InterviewRequestRow[] | null>(null);
   const [proposalRows, setProposalRows] = useState<EngagementProposalRow[] | null>(null);
-  const [dashboardEmail, setDashboardEmail] = useState<string | null>(null);
   const [noProfileForEmail, setNoProfileForEmail] = useState(false);
   const [hasUnclaimedProfile, setHasUnclaimedProfile] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [interviewFilter, setInterviewFilter] = useState<InterviewStatusFilter>("all");
   const [kindTab, setKindTab] = useState<KindTab>("all");
+  const [talentName, setTalentName] = useState<string>("");
+  const [onboarding, setOnboarding] = useState<OnboardingSummary>({
+    profileComplete: false,
+    avatarComplete: false,
+    photoComplete: false,
+    cvComplete: false,
+    idComplete: false,
+    availabilityComplete: false,
+  });
 
   const interviewCounts = useMemo(
     () => (interviewRows != null ? summarizeInterviews(interviewRows) : null),
@@ -176,7 +192,6 @@ export default function ConsultantDashboardPage() {
   const showProposals = kindTab === "all" || kindTab === "proposals";
 
   const loadDashboard = useCallback(async (trimmed: string) => {
-    setDashboardEmail(trimmed);
     setLoading(true);
     setError(null);
     setNoProfileForEmail(false);
@@ -186,14 +201,15 @@ export default function ConsultantDashboardPage() {
 
     const { data: resourceRows, error: resourcesError } = await supabase
       .from("resources")
-      .select("id, name, claimed, available_from")
+      .select(
+        "id, name, claimed, available_from, headline, bio, hourly_rate, location, avatar_key, profile_photo_path, cv_document_path, id_front_document_path, id_back_document_path",
+      )
       .ilike("contact_email", trimmed);
 
     if (resourcesError) {
       setError(resourcesError.message);
       setInterviewRows(null);
       setProposalRows(null);
-      setDashboardEmail(null);
       setHasUnclaimedProfile(false);
       setLoading(false);
       return;
@@ -203,7 +219,6 @@ export default function ConsultantDashboardPage() {
     if (resources.length === 0) {
       setInterviewRows([]);
       setProposalRows([]);
-      setDashboardEmail(trimmed);
       setNoProfileForEmail(true);
       setHasUnclaimedProfile(false);
       setLoading(false);
@@ -216,6 +231,62 @@ export default function ConsultantDashboardPage() {
         return c !== true;
       }),
     );
+
+    const claimedResource = resources.find((r) => (r as { claimed?: boolean | null }).claimed === true) as
+      | {
+          id: string;
+          name: string | null;
+          headline: string | null;
+          bio: string | null;
+          hourly_rate: number | null;
+          location: string | null;
+          avatar_key: string | null;
+          profile_photo_path: string | null;
+          cv_document_path: string | null;
+          id_front_document_path: string | null;
+          id_back_document_path: string | null;
+          available_from: string | null;
+        }
+      | undefined;
+    if (claimedResource) {
+      const profileComplete =
+        Boolean(claimedResource.name && claimedResource.name.trim() !== "") &&
+        Boolean(claimedResource.headline && claimedResource.headline.trim() !== "") &&
+        Boolean(claimedResource.bio && claimedResource.bio.trim() !== "") &&
+        claimedResource.hourly_rate != null &&
+        Boolean(claimedResource.location && claimedResource.location.trim() !== "");
+      const avatarComplete = Boolean(claimedResource.avatar_key && claimedResource.avatar_key.trim() !== "");
+      const photoComplete = Boolean(
+        claimedResource.profile_photo_path && claimedResource.profile_photo_path.trim() !== "",
+      );
+      const cvComplete = Boolean(claimedResource.cv_document_path && claimedResource.cv_document_path.trim() !== "");
+      const idFrontComplete = Boolean(
+        claimedResource.id_front_document_path && claimedResource.id_front_document_path.trim() !== "",
+      );
+      const idBackComplete = Boolean(
+        claimedResource.id_back_document_path && claimedResource.id_back_document_path.trim() !== "",
+      );
+      setTalentName(claimedResource.name?.trim() ?? "");
+      setOnboarding((prev) => ({
+        ...prev,
+        profileComplete,
+        avatarComplete,
+        photoComplete,
+        cvComplete,
+        idComplete: idFrontComplete && idBackComplete,
+        availabilityComplete: Boolean(claimedResource.available_from && claimedResource.available_from.trim() !== ""),
+      }));
+    } else {
+      setTalentName("");
+      setOnboarding({
+        profileComplete: false,
+        avatarComplete: false,
+        photoComplete: false,
+        cvComplete: false,
+        idComplete: false,
+        availabilityComplete: false,
+      });
+    }
 
     const nameByResourceId: Record<string, string> = {};
     const availableFromByResourceId: Record<string, string | null> = {};
@@ -266,6 +337,9 @@ export default function ConsultantDashboardPage() {
       const upcoming = upcomingBlockedByResource.get(id);
       nextBlockedByResourceId[id] = upcoming != null && upcoming.length > 0 ? upcoming[0] : null;
     }
+    if (claimedResource != null && nextBlockedByResourceId[claimedResource.id] != null) {
+      setOnboarding((prev) => ({ ...prev, availabilityComplete: true }));
+    }
 
     const [irRes, epRes] = await Promise.all([
       supabase
@@ -296,7 +370,6 @@ export default function ConsultantDashboardPage() {
       setError(errParts.join(" "));
       setInterviewRows(null);
       setProposalRows(null);
-      setDashboardEmail(null);
       setLoading(false);
       return;
     }
@@ -378,7 +451,6 @@ export default function ConsultantDashboardPage() {
         setError("Your account has no email address. Add an email to your Procal login to view your talent dashboard.");
         setInterviewRows([]);
         setProposalRows([]);
-        setDashboardEmail(null);
         setNoProfileForEmail(false);
         setHasUnclaimedProfile(false);
         setLoading(false);
@@ -412,42 +484,89 @@ export default function ConsultantDashboardPage() {
         <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-6 sm:px-6 md:gap-8 md:px-10 md:pb-20 md:pt-8">
           <header className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/25 backdrop-blur-md md:p-8">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-[#ff6a00] md:text-[11px]">
-              Talent dashboard
+              TALENT DASHBOARD
             </p>
             <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">Manage your opportunities</h1>
+                <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
+                  {talentName !== "" ? `Welcome back, ${talentName}` : "Welcome back"}
+                </h1>
                 <p className="mt-2 text-sm leading-relaxed text-white/60">
-                  Track interview requests, engagement proposals, and your profile visibility.
+                  Manage your profile, availability, and opportunities.
                 </p>
-                {dashboardEmail != null ? (
-                  <p className="mt-3 text-xs text-white/45">Showing talent profile for {dashboardEmail}</p>
-                ) : null}
-              </div>
-              <div className="grid w-full gap-2 sm:w-auto sm:min-w-[15rem]">
-                <Link
-                  href="/consultant/edit"
-                  className="inline-flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition hover:border-[#ff6a00]/45 hover:bg-white/[0.08]"
-                >
-                  Edit profile
-                  <span className="text-white/40">→</span>
-                </Link>
-                <Link
-                  href="/consultant/availability"
-                  className="inline-flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition hover:border-[#ff6a00]/45 hover:bg-white/[0.08]"
-                >
-                  Manage availability
-                  <span className="text-white/40">→</span>
-                </Link>
-                <Link
-                  href="/marketplace"
-                  className="inline-flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition hover:border-[#ff6a00]/45 hover:bg-white/[0.08]"
-                >
-                  View marketplace
-                  <span className="text-white/40">→</span>
-                </Link>
               </div>
             </div>
+            {!noProfileForEmail ? (
+              <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-white/45">Setup progress</p>
+                <div className="mt-3 flex flex-wrap gap-3 text-xs text-white/75">
+                  {[
+                    ["Profile", onboarding.profileComplete],
+                    ["Avatar", onboarding.avatarComplete],
+                    ["Photo", onboarding.photoComplete],
+                    ["CV", onboarding.cvComplete],
+                    ["ID", onboarding.idComplete],
+                    ["Availability", onboarding.availabilityComplete],
+                  ].map(([label, done]) => (
+                    <span key={String(label)} className="inline-flex items-center gap-1.5">
+                      <span className={done ? "text-emerald-400" : "text-white/35"} aria-hidden>
+                        {done ? "✓" : "○"}
+                      </span>
+                      {label}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-3 text-sm text-white/70">
+                  Next:{" "}
+                  {!onboarding.profileComplete || !onboarding.avatarComplete || !onboarding.photoComplete ? (
+                    <Link href="/talent/edit" className="font-semibold text-[#ff6a00] hover:underline">
+                      Edit profile
+                    </Link>
+                  ) : !onboarding.cvComplete || !onboarding.idComplete ? (
+                    <Link href="/talent/edit" className="font-semibold text-[#ff6a00] hover:underline">
+                      Edit profile
+                    </Link>
+                  ) : !onboarding.availabilityComplete ? (
+                    <Link href="/talent/availability" className="font-semibold text-[#ff6a00] hover:underline">
+                      Manage availability
+                    </Link>
+                  ) : (
+                    <a href="#requests-and-proposals" className="font-semibold text-[#ff6a00] hover:underline">
+                      Track requests
+                    </a>
+                  )}
+                </div>
+              </div>
+            ) : null}
+            <section className="mt-5 grid gap-3 md:grid-cols-3">
+              <Link
+                href="/talent/edit"
+                className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition hover:border-[#ff6a00]/45 hover:bg-white/[0.08]"
+              >
+                <p className="text-sm font-semibold text-white">Edit profile</p>
+                <p className="mt-1 text-xs text-white/60">
+                  Complete your public profile, avatar, photo, CV and ID.
+                </p>
+              </Link>
+              <Link
+                href="/talent/availability"
+                className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition hover:border-[#ff6a00]/45 hover:bg-white/[0.08]"
+              >
+                <p className="text-sm font-semibold text-white">Manage availability</p>
+                <p className="mt-1 text-xs text-white/60">
+                  Set your available-from date and block unavailable days.
+                </p>
+              </Link>
+              <a
+                href="#requests-and-proposals"
+                className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition hover:border-[#ff6a00]/45 hover:bg-white/[0.08]"
+              >
+                <p className="text-sm font-semibold text-white">Track requests</p>
+                <p className="mt-1 text-xs text-white/60">
+                  Review interview requests and engagement proposals.
+                </p>
+              </a>
+            </section>
           </header>
 
         {loading ? (
@@ -460,7 +579,7 @@ export default function ConsultantDashboardPage() {
               Claim your profile to manage your information
             </p>
             <Link
-              href="/consultant/claim"
+              href="/talent/claim"
               className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-[#ff6a00] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-105"
             >
               Claim profile
@@ -481,20 +600,14 @@ export default function ConsultantDashboardPage() {
         {hasLoaded && !noProfileForEmail && !error && bothEmpty ? (
           <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm text-white/65">
             <p>No interview requests or engagement proposals yet for your profile(s).</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Link href="/consultant/edit" className="text-[#ff6a00] hover:underline">
-                Edit profile
-              </Link>
-              <span className="text-white/30">•</span>
-              <Link href="/consultant/availability" className="text-[#ff6a00] hover:underline">
-                Manage availability
-              </Link>
-            </div>
           </div>
         ) : null}
 
         {hasLoaded && !noProfileForEmail && !error && !bothEmpty ? (
           <>
+            <h2 id="requests-and-proposals" className="text-base font-semibold tracking-tight text-white">
+              Requests and proposals
+            </h2>
             <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-black/20 backdrop-blur-md">
                 <p className="text-xs font-medium uppercase tracking-wide text-white/50">Total interview requests</p>

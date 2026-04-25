@@ -224,34 +224,34 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="mt-5 w-full max-w-2xl rounded-2xl border border-white/10 bg-black/30 p-5 shadow-lg shadow-black/25 backdrop-blur-md sm:max-w-3xl sm:p-6 md:rounded-3xl">
-            <div className="grid gap-6 md:grid-cols-2 md:items-start md:gap-8">
+          <div className="mt-4 w-full max-w-2xl rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 backdrop-blur-sm sm:px-5 sm:py-4 md:rounded-2xl">
+            <div className="grid gap-4 md:grid-cols-2 md:items-start md:gap-5">
               <div className="flex flex-col items-center text-center md:items-start md:text-left">
                 <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/[0.12]"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/20"
                   aria-hidden
                 >
-                  <SearchIcon className="h-5 w-5" style={{ color: ACCENT }} />
+                  <SearchIcon className="h-4 w-4 opacity-90" style={{ color: ACCENT }} />
                 </div>
-                <h2 className="mt-3 text-base font-semibold tracking-tight text-white sm:text-lg">
+                <h2 className="mt-2.5 text-sm font-semibold tracking-tight text-white/95 sm:text-base">
                   Find the right talent
                 </h2>
-                <p className="mt-2 max-w-xs text-xs leading-relaxed text-white/65 sm:max-w-[17rem] sm:text-sm">
-                  Search verified professionals and find the perfect fit for your project.
+                <p className="mt-1.5 max-w-xs text-xs leading-snug text-white/55 sm:max-w-[16rem] sm:text-sm sm:leading-snug">
+                  Search verified professionals for your project.
                 </p>
               </div>
-              <div className="flex flex-col items-center border-t border-white/[0.08] pt-6 text-center md:border-l md:border-t-0 md:pl-8 md:pt-0 md:items-start md:text-left">
+              <div className="flex flex-col items-center border-t border-white/[0.06] pt-4 text-center md:border-l md:border-t-0 md:pl-6 md:pt-0 md:items-start md:text-left">
                 <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/[0.12]"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/20"
                   aria-hidden
                 >
-                  <UserIcon className="h-5 w-5" style={{ color: ACCENT }} />
+                  <UserIcon className="h-4 w-4 opacity-90" style={{ color: ACCENT }} />
                 </div>
-                <h2 className="mt-3 text-base font-semibold tracking-tight text-white sm:text-lg">
+                <h2 className="mt-2.5 text-sm font-semibold tracking-tight text-white/95 sm:text-base">
                   Showcase your skills
                 </h2>
-                <p className="mt-2 max-w-xs text-xs leading-relaxed text-white/65 sm:max-w-[17rem] sm:text-sm">
-                  Create your profile, get discovered and grow your opportunities.
+                <p className="mt-1.5 max-w-xs text-xs leading-snug text-white/55 sm:max-w-[16rem] sm:text-sm sm:leading-snug">
+                  Create your profile and get discovered.
                 </p>
               </div>
             </div>
@@ -270,7 +270,7 @@ export default function HomePage() {
               Already requested talent? Open your company dashboard
             </Link>
             <Link
-              href="/login?next=/consultant"
+              href="/login?next=/talent"
               className="text-sm text-white/55 underline-offset-4 transition-colors hover:text-white/90 hover:underline"
             >
               Already listed? Open your talent dashboard

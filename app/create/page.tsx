@@ -17,7 +17,7 @@ export default async function CreateRedirectPage() {
       .maybeSingle();
     const role = profile != null ? (profile as { role: string }).role : null;
     if (role === "consultant") {
-      redirect("/consultant/edit");
+      redirect("/talent");
     }
   }
 

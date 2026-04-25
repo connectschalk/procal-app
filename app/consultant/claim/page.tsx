@@ -178,7 +178,7 @@ export default function ConsultantClaimPage() {
             <p className="text-base font-medium text-emerald-950">Profile claimed successfully</p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link
-                href="/consultant"
+                href="/talent"
                 className="inline-flex items-center justify-center rounded-full bg-emerald-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"
               >
                 Open talent dashboard
@@ -194,7 +194,7 @@ export default function ConsultantClaimPage() {
         ) : null}
 
         <p className="text-center text-xs text-zinc-500">
-          <Link href="/consultant" className="font-medium text-orange-700 underline-offset-2 hover:underline">
+          <Link href="/talent" className="font-medium text-orange-700 underline-offset-2 hover:underline">
             ← Talent Dashboard
           </Link>
         </p>

@@ -15,10 +15,12 @@ type PageProps = {
 };
 
 function TalentAvatarCircle({
+  imagePath,
   primary,
   secondary,
   label,
 }: {
+  imagePath: string | null;
   primary: string;
   secondary: string;
   label: string;
@@ -29,8 +31,15 @@ function TalentAvatarCircle({
       aria-hidden
       title={label}
     >
-      <span className="select-none text-[2.75rem] leading-none md:text-[3.75rem]">{primary}</span>
-      <span className="select-none text-[1.35rem] leading-none md:text-[1.85rem]">{secondary}</span>
+      {imagePath != null ? (
+        // eslint-disable-next-line @next/next/no-img-element -- static stand-in avatar image
+        <img src={imagePath} alt={label} className="h-full w-full rounded-full object-cover" />
+      ) : (
+        <>
+          <span className="select-none text-[2.75rem] leading-none md:text-[3.75rem]">{primary}</span>
+          <span className="select-none text-[1.35rem] leading-none md:text-[1.85rem]">{secondary}</span>
+        </>
+      )}
     </div>
   );
 }
@@ -193,6 +202,7 @@ export default async function ConsultantProfilePage({ params }: PageProps) {
               <div className="flex shrink-0 flex-col items-center md:items-center">
                 {/* TODO: Later: show profile_photo_path (real photo) only after company payment / unlock. */}
                 <TalentAvatarCircle
+                  imagePath={avatarVisual.imagePath}
                   primary={avatarVisual.primary}
                   secondary={avatarVisual.secondary}
                   label={avatarVisual.label}

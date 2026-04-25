@@ -3,11 +3,9 @@
 // Day-based MVP (available_from + resource_blocked_dates). Legacy resource_availability (012) is unused — see supabase/sql/013_day_based_availability_mvp.sql
 
 import { AppTopNav } from "@/components/app-top-nav";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-
-const STORAGE_KEY = "procal.consultantEmail";
 
 type BlockedRow = {
   id: string;
@@ -202,10 +200,10 @@ async function callUpdateAvailability(
 }
 
 export default function ConsultantAvailabilityPage() {
-  const [email, setEmail] = useState("");
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [dashboardEmail, setDashboardEmail] = useState<string | null>(null);
   const [resourceId, setResourceId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [availableFrom, setAvailableFrom] = useState("");
   const [blockedRows, setBlockedRows] = useState<BlockedRow[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
@@ -259,11 +257,11 @@ export default function ConsultantAvailabilityPage() {
         reason: (r.reason as string | null) ?? null,
       })),
     );
-  }, []);
+  }, [supabase]);
 
   const loadResource = useCallback(
     async (trimmed: string) => {
-      setEmail(trimmed);
+      setDashboardEmail(trimmed);
       setLoading(true);
       setError(null);
       setNoProfile(false);
@@ -315,61 +313,29 @@ export default function ConsultantAvailabilityPage() {
       setAvailableFrom(af != null && String(af).trim() !== "" ? String(af).slice(0, 10) : "");
       await fetchBlocked(row.id);
     },
-    [fetchBlocked],
+    [fetchBlocked, supabase],
   );
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      const trimmed = stored?.trim();
-      if (trimmed) {
-        queueMicrotask(() => {
-          void loadResource(trimmed);
-        });
+    let cancelled = false;
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled) return;
+      const trimmed = user?.email?.trim();
+      if (!trimmed) {
+        setError("Your account has no email address. Add an email to your Procal login to manage availability.");
+        setDashboardEmail(null);
+        setLoading(false);
+        return;
       }
-    } catch {
-      /* ignore */
-    }
-  }, [loadResource]);
-
-  async function handleLoadEmail(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const trimmed = email.trim();
-    if (!trimmed) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, trimmed);
-    } catch {
-      /* ignore */
-    }
-    await loadResource(trimmed);
-  }
-
-  function handleChangeEmail() {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
-    setEmail("");
-    setDashboardEmail(null);
-    setResourceId(null);
-    setAvailableFrom("");
-    setBlockedRows([]);
-    setError(null);
-    setNoProfile(false);
-    setAmbiguous(false);
-    setNotClaimed(false);
-    setCanManage(false);
-    setDefaultBlockReason("");
-    setVisibleMonth(() => {
-      const n = new Date();
-      return { year: n.getFullYear(), month: n.getMonth() };
-    });
-    setRangeStart("");
-    setRangeEnd("");
-    setRangeReason("");
-    setRangeFieldError(null);
-  }
+      await loadResource(trimmed);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, loadResource]);
 
   async function handleSaveAvailableFrom(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -518,48 +484,15 @@ export default function ConsultantAvailabilityPage() {
                 Set when you are generally available and block full days you cannot take meetings.
               </p>
             </div>
-            {dashboardEmail != null ? (
-              <button
-                type="button"
-                onClick={handleChangeEmail}
-                className="shrink-0 self-start text-sm font-medium text-orange-700 underline-offset-2 hover:underline"
-              >
-                Change email
-              </button>
-            ) : null}
           </div>
           {dashboardEmail != null ? (
-            <p className="text-xs text-zinc-500">Managing as: {dashboardEmail}</p>
+            <p className="text-xs text-zinc-500">Showing talent profile for {dashboardEmail}</p>
           ) : null}
         </header>
 
-        <form
-          onSubmit={handleLoadEmail}
-          className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-zinc-50/40 p-5 md:flex-row md:items-end md:gap-4 md:p-6"
-        >
-          <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-            <span className="font-medium text-zinc-800">Profile contact email</span>
-            <input
-              required
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              placeholder="you@example.com"
-              disabled={canManage}
-              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none ring-zinc-950 placeholder:text-zinc-400 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-500"
-            />
-          </label>
-          {!canManage ? (
-            <button
-              type="submit"
-              disabled={loading}
-              className="shrink-0 rounded-full bg-zinc-950 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 disabled:opacity-60"
-            >
-              {loading ? "Loading…" : "Continue"}
-            </button>
-          ) : null}
-        </form>
+        {loading ? (
+          <p className="text-sm text-zinc-500">Loading availability…</p>
+        ) : null}
 
         {error ? (
           <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>

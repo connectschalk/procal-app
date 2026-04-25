@@ -1,8 +1,11 @@
 import { AppTopNav } from "@/components/app-top-nav";
 import { EngagementProposalForm } from "@/components/engagement-proposal-form";
+import { requireCompany } from "@/lib/require-role";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
+export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -10,6 +13,7 @@ type PageProps = {
 
 export default async function ProposeEngagementPage({ params }: PageProps) {
   const { id } = await params;
+  await requireCompany({ returnPath: `/consultants/${id}/propose-engagement` });
 
   const { data, error } = await supabase
     .from("resources")

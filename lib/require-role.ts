@@ -61,17 +61,33 @@ export async function requireConsultant(): Promise<void> {
   }
 }
 
+export type RequireCompanyOptions = {
+  /**
+   * When set (e.g. company action under /consultants/...): unauthenticated →
+   * `/login?next=<returnPath>`; missing profile or non-company → `/marketplace`.
+   * When omitted (e.g. /company dashboard): same as before → `/login` and `/`.
+   */
+  returnPath?: string;
+};
+
 /**
- * Server-only guard for Company App Router pages under /company.
- * No user → /login. User without company role → /. Company → returns (render page).
+ * Server-only guard for company-only routes.
+ * Default: no user → /login; wrong role or no profile → /.
+ * With `returnPath`: no user → login with next; wrong role or no profile → /marketplace.
  */
-export async function requireCompany(): Promise<void> {
+export async function requireCompany(options?: RequireCompanyOptions): Promise<void> {
+  const returnPath = options?.returnPath;
+  const useActionRedirects = returnPath != null && returnPath.trim() !== "";
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (user == null) {
+    if (useActionRedirects) {
+      redirect(`/login?next=${encodeURIComponent(returnPath.trim())}`);
+    }
     redirect("/login");
   }
 
@@ -82,11 +98,11 @@ export async function requireCompany(): Promise<void> {
     .maybeSingle();
 
   if (error != null || profile == null) {
-    redirect("/");
+    redirect(useActionRedirects ? "/marketplace" : "/");
   }
 
   const role = (profile as { role: string }).role;
   if (role !== "company") {
-    redirect("/");
+    redirect(useActionRedirects ? "/marketplace" : "/");
   }
 }

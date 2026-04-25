@@ -1,10 +1,8 @@
 "use client";
 
 import { AppTopNav } from "@/components/app-top-nav";
-import { supabase } from "@/lib/supabase";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-
-const STORAGE_KEY = "procal.companyEmail";
+import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type InterviewRequestRow = {
   id: string;
@@ -150,11 +148,11 @@ function summarizeProposals(rows: EngagementProposalRow[]) {
 }
 
 export default function CompanyDashboardPage() {
-  const [email, setEmail] = useState("");
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [interviewRows, setInterviewRows] = useState<InterviewRequestRow[] | null>(null);
   const [proposalRows, setProposalRows] = useState<EngagementProposalRow[] | null>(null);
   const [dashboardEmail, setDashboardEmail] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [interviewFilter, setInterviewFilter] = useState<InterviewStatusFilter>("all");
   const [kindTab, setKindTab] = useState<KindTab>("all");
@@ -178,7 +176,7 @@ export default function CompanyDashboardPage() {
   const showProposals = kindTab === "all" || kindTab === "proposals";
 
   const loadDashboard = useCallback(async (trimmed: string) => {
-    setEmail(trimmed);
+    setDashboardEmail(trimmed);
     setLoading(true);
     setError(null);
     setInterviewFilter("all");
@@ -337,52 +335,31 @@ export default function CompanyDashboardPage() {
             next_blocked_date: nextBlockedByResourceId[r.resource_id] ?? null,
           })),
     );
-    setDashboardEmail(trimmed);
     setLoading(false);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      const trimmed = stored?.trim();
-      if (trimmed) {
-        queueMicrotask(() => {
-          void loadDashboard(trimmed);
-        });
+    let cancelled = false;
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled) return;
+      const trimmed = user?.email?.trim();
+      if (!trimmed) {
+        setError("Your account has no email address. Add an email to your Procal login to view company activity.");
+        setInterviewRows([]);
+        setProposalRows([]);
+        setDashboardEmail(null);
+        setLoading(false);
+        return;
       }
-    } catch {
-      /* ignore */
-    }
-  }, [loadDashboard]);
-
-  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const trimmed = email.trim();
-    if (!trimmed) return;
-
-    try {
-      localStorage.setItem(STORAGE_KEY, trimmed);
-    } catch {
-      /* ignore */
-    }
-
-    await loadDashboard(trimmed);
-  }
-
-  function handleChangeEmail() {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
-    setEmail("");
-    setInterviewRows(null);
-    setProposalRows(null);
-    setDashboardEmail(null);
-    setError(null);
-    setInterviewFilter("all");
-    setKindTab("all");
-  }
+      await loadDashboard(trimmed);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, loadDashboard]);
 
   const hasLoaded = interviewRows !== null && proposalRows !== null;
   const totalInterviews = interviewRows?.length ?? 0;
@@ -401,45 +378,15 @@ export default function CompanyDashboardPage() {
                 Track your interview requests and engagement proposals in one place.
               </p>
             </div>
-            {dashboardEmail != null ? (
-              <button
-                type="button"
-                onClick={handleChangeEmail}
-                className="shrink-0 self-start text-sm font-medium text-orange-700 underline-offset-2 hover:underline"
-              >
-                Change email
-              </button>
-            ) : null}
           </div>
           {dashboardEmail != null ? (
-            <p className="text-xs text-zinc-500">Showing activity for: {dashboardEmail}</p>
+            <p className="text-xs text-zinc-500">Showing activity for {dashboardEmail}</p>
           ) : null}
         </header>
 
-        <form
-          onSubmit={handleSubmit}
-          className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-zinc-50/40 p-5 md:flex-row md:items-end md:gap-4 md:p-6"
-        >
-          <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-            <span className="font-medium text-zinc-800">Work email</span>
-            <input
-              required
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              placeholder="you@company.com"
-              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none ring-zinc-950 placeholder:text-zinc-400 focus:ring-2"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={loading}
-            className="shrink-0 rounded-full bg-zinc-950 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 disabled:opacity-60"
-          >
-            {loading ? "Loading…" : "Load dashboard"}
-          </button>
-        </form>
+        {loading ? (
+          <p className="text-sm text-zinc-500">Loading your dashboard…</p>
+        ) : null}
 
         {error ? (
           <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>

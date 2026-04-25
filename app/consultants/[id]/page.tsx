@@ -1,8 +1,11 @@
 import { AppTopNav } from "@/components/app-top-nav";
 import { PublicAvailabilityCalendar } from "@/components/public-availability-calendar";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
+export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -18,6 +21,18 @@ function formatHourlyRateZar(rate: number | null) {
 
 export default async function ConsultantProfilePage({ params }: PageProps) {
   const { id } = await params;
+
+  const supabaseServer = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabaseServer.auth.getUser();
+
+  const requestInterviewPath = `/consultants/${id}/request-interview`;
+  const proposeEngagementPath = `/consultants/${id}/propose-engagement`;
+  const requestInterviewHref =
+    user != null ? requestInterviewPath : `/login?next=${encodeURIComponent(requestInterviewPath)}`;
+  const proposeEngagementHref =
+    user != null ? proposeEngagementPath : `/login?next=${encodeURIComponent(proposeEngagementPath)}`;
 
   const { data, error } = await supabase
     .from("resources")
@@ -110,13 +125,13 @@ export default async function ConsultantProfilePage({ params }: PageProps) {
 
       <div className="mt-12 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Link
-          href={`/consultants/${id}/request-interview`}
+          href={requestInterviewHref}
           className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-zinc-950 px-6 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 sm:flex-none"
         >
           Request interview
         </Link>
         <Link
-          href={`/consultants/${id}/propose-engagement`}
+          href={proposeEngagementHref}
           className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full border border-zinc-300 bg-white px-6 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-50 sm:flex-none"
         >
           Propose engagement

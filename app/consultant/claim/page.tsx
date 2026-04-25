@@ -1,17 +1,37 @@
 "use client";
 
 import { AppTopNav } from "@/components/app-top-nav";
+import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 type Step = "email" | "code" | "done";
 
 export default function ConsultantClaimPage() {
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled) return;
+      const em = user?.email?.trim() ?? "";
+      setEmail(em);
+      if (!em) {
+        setError("Your account has no email address. Add an email to your Procal login before claiming a profile.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
 
   async function handleSendCode(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -82,20 +102,21 @@ export default function ConsultantClaimPage() {
               <span className="font-medium text-zinc-800">Profile contact email</span>
               <input
                 required
+                readOnly
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
                 placeholder="you@example.com"
-                className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none ring-zinc-950 placeholder:text-zinc-400 focus:ring-2"
+                className="cursor-not-allowed rounded-lg border border-zinc-200 bg-zinc-100 px-3 py-2 text-zinc-700 outline-none ring-zinc-950"
               />
+              <span className="text-xs text-zinc-500">Codes are sent only to your signed-in email.</span>
             </label>
             {error ? (
               <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
             ) : null}
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || email.trim() === ""}
               className="rounded-full bg-zinc-950 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 disabled:opacity-60"
             >
               {submitting ? "Sending…" : "Send code"}
@@ -146,7 +167,7 @@ export default function ConsultantClaimPage() {
                 }}
                 className="text-sm font-medium text-zinc-600 underline-offset-2 hover:text-zinc-900 hover:underline"
               >
-                Use a different email
+                Back
               </button>
             </div>
           </form>

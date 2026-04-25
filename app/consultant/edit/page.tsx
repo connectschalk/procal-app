@@ -1,16 +1,14 @@
 "use client";
 
 import { AppTopNav } from "@/components/app-top-nav";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import Link from "next/link";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
-
-const STORAGE_KEY = "procal.consultantEmail";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 export default function ConsultantEditProfilePage() {
-  const [email, setEmail] = useState("");
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [dashboardEmail, setDashboardEmail] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [noProfile, setNoProfile] = useState(false);
@@ -26,7 +24,7 @@ export default function ConsultantEditProfilePage() {
   const [location, setLocation] = useState("");
 
   const loadProfile = useCallback(async (trimmed: string) => {
-    setEmail(trimmed);
+    setDashboardEmail(trimmed);
     setLoading(true);
     setError(null);
     setNoProfile(false);
@@ -83,49 +81,28 @@ export default function ConsultantEditProfilePage() {
     setLocation((row.location as string | null) ?? "");
     const rate = row.hourly_rate;
     setHourlyRate(rate != null && Number.isFinite(Number(rate)) ? String(rate) : "");
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      const trimmed = stored?.trim();
-      if (trimmed) {
-        queueMicrotask(() => {
-          void loadProfile(trimmed);
-        });
+    let cancelled = false;
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled) return;
+      const trimmed = user?.email?.trim();
+      if (!trimmed) {
+        setError("Your account has no email address. Add an email to your Procal login to edit your profile.");
+        setDashboardEmail(null);
+        setLoading(false);
+        return;
       }
-    } catch {
-      /* ignore */
-    }
-  }, [loadProfile]);
-
-  async function handleLoadEmail(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const trimmed = email.trim();
-    if (!trimmed) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, trimmed);
-    } catch {
-      /* ignore */
-    }
-    await loadProfile(trimmed);
-  }
-
-  function handleChangeEmail() {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
-    setEmail("");
-    setDashboardEmail(null);
-    setError(null);
-    setNoProfile(false);
-    setAmbiguous(false);
-    setNotClaimed(false);
-    setCanEdit(false);
-    setSuccess(false);
-  }
+      await loadProfile(trimmed);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, loadProfile]);
 
   async function handleSaveProfile(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -185,51 +162,18 @@ export default function ConsultantEditProfilePage() {
             <div className="space-y-2">
               <h1 className="text-2xl font-semibold tracking-tight text-zinc-950 md:text-3xl">Edit profile</h1>
               <p className="text-sm leading-relaxed text-zinc-600">
-                Enter the contact email on your claimed Procal profile to update how you appear on the marketplace.
+                Update how your claimed talent profile appears on the marketplace.
               </p>
             </div>
-            {dashboardEmail != null ? (
-              <button
-                type="button"
-                onClick={handleChangeEmail}
-                className="shrink-0 self-start text-sm font-medium text-orange-700 underline-offset-2 hover:underline"
-              >
-                Change email
-              </button>
-            ) : null}
           </div>
           {dashboardEmail != null ? (
-            <p className="text-xs text-zinc-500">Editing as: {dashboardEmail}</p>
+            <p className="text-xs text-zinc-500">Showing talent profile for {dashboardEmail}</p>
           ) : null}
         </header>
 
-        <form
-          onSubmit={handleLoadEmail}
-          className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-zinc-50/40 p-5 md:flex-row md:items-end md:gap-4 md:p-6"
-        >
-          <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-            <span className="font-medium text-zinc-800">Profile contact email</span>
-            <input
-              required
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              placeholder="you@example.com"
-              disabled={canEdit}
-              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none ring-zinc-950 placeholder:text-zinc-400 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-500"
-            />
-          </label>
-          {!canEdit ? (
-            <button
-              type="submit"
-              disabled={loading}
-              className="shrink-0 rounded-full bg-zinc-950 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 disabled:opacity-60"
-            >
-              {loading ? "Loading…" : "Continue"}
-            </button>
-          ) : null}
-        </form>
+        {loading ? (
+          <p className="text-sm text-zinc-500">Loading your profile…</p>
+        ) : null}
 
         {error ? (
           <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>

@@ -21,7 +21,7 @@ export default function HomePage() {
           Marketplace
         </Link>
         <Link
-          href="/create"
+          href="/signup?role=consultant"
           className="text-sm font-medium text-white/80 transition-colors hover:text-white"
         >
           For talent
@@ -67,7 +67,7 @@ export default function HomePage() {
               </span>
             </Link>
             <Link
-              href="/create"
+              href="/signup?role=consultant"
               className="group flex cursor-pointer flex-col items-center gap-1 rounded-2xl border border-white/12 bg-slate-900/90 px-6 py-5 text-center shadow-md shadow-black/25 transition duration-200 ease-out hover:scale-[1.02] hover:border-white/20 hover:bg-slate-800/95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950/80"
             >
               <span className="text-xl font-semibold tracking-tight text-white">Talent</span>
@@ -79,13 +79,13 @@ export default function HomePage() {
 
           <div className="mt-6 flex flex-col items-center gap-2 text-center">
             <Link
-              href="/company"
+              href="/login?next=/company"
               className="text-sm text-white/55 underline-offset-4 transition-colors hover:text-white/90 hover:underline"
             >
               Already requested talent? Open your company dashboard
             </Link>
             <Link
-              href="/consultant"
+              href="/login?next=/consultant"
               className="text-sm text-white/55 underline-offset-4 transition-colors hover:text-white/90 hover:underline"
             >
               Already listed? Open your talent dashboard

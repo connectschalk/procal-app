@@ -34,3 +34,15 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Supabase email confirmation
+
+With email confirmation enabled, the app sets `emailRedirectTo` to `{origin}/auth/callback` on sign-up so users land in the role-based dashboard after confirming.
+
+In the Supabase dashboard, add your callback URL under **Authentication → URL configuration → Redirect URLs** (e.g. `https://procal.co.za/auth/callback` and `http://localhost:3000/auth/callback` for dev).
+
+If you customize the **Confirm signup** email template, ensure the link still reaches `/auth/callback` (the default `{{ .ConfirmationURL }}` is usually enough when redirect URLs are configured). To append `redirect_to` explicitly, you can use:
+
+`{{ .ConfirmationURL }}&redirect_to=https://procal.co.za/auth/callback`
+
+(Replace the host with your production origin.)

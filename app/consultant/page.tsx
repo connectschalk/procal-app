@@ -1,11 +1,9 @@
 "use client";
 
 import { AppTopNav } from "@/components/app-top-nav";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-
-const STORAGE_KEY = "procal.consultantEmail";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type InterviewRequestRow = {
   id: string;
@@ -148,13 +146,13 @@ function summarizeProposals(rows: EngagementProposalRow[]) {
 }
 
 export default function ConsultantDashboardPage() {
-  const [email, setEmail] = useState("");
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [interviewRows, setInterviewRows] = useState<InterviewRequestRow[] | null>(null);
   const [proposalRows, setProposalRows] = useState<EngagementProposalRow[] | null>(null);
   const [dashboardEmail, setDashboardEmail] = useState<string | null>(null);
   const [noProfileForEmail, setNoProfileForEmail] = useState(false);
   const [hasUnclaimedProfile, setHasUnclaimedProfile] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [interviewFilter, setInterviewFilter] = useState<InterviewStatusFilter>("all");
   const [kindTab, setKindTab] = useState<KindTab>("all");
@@ -178,7 +176,7 @@ export default function ConsultantDashboardPage() {
   const showProposals = kindTab === "all" || kindTab === "proposals";
 
   const loadDashboard = useCallback(async (trimmed: string) => {
-    setEmail(trimmed);
+    setDashboardEmail(trimmed);
     setLoading(true);
     setError(null);
     setNoProfileForEmail(false);
@@ -364,55 +362,34 @@ export default function ConsultantDashboardPage() {
             next_blocked_date: nextBlockedByResourceId[r.resource_id] ?? null,
           })),
     );
-    setDashboardEmail(trimmed);
     setNoProfileForEmail(false);
     setLoading(false);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      const trimmed = stored?.trim();
-      if (trimmed) {
-        queueMicrotask(() => {
-          void loadDashboard(trimmed);
-        });
+    let cancelled = false;
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled) return;
+      const trimmed = user?.email?.trim();
+      if (!trimmed) {
+        setError("Your account has no email address. Add an email to your Procal login to view your talent dashboard.");
+        setInterviewRows([]);
+        setProposalRows([]);
+        setDashboardEmail(null);
+        setNoProfileForEmail(false);
+        setHasUnclaimedProfile(false);
+        setLoading(false);
+        return;
       }
-    } catch {
-      /* ignore */
-    }
-  }, [loadDashboard]);
-
-  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const trimmed = email.trim();
-    if (!trimmed) return;
-
-    try {
-      localStorage.setItem(STORAGE_KEY, trimmed);
-    } catch {
-      /* ignore */
-    }
-
-    await loadDashboard(trimmed);
-  }
-
-  function handleChangeEmail() {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
-    setEmail("");
-    setInterviewRows(null);
-    setProposalRows(null);
-    setDashboardEmail(null);
-    setNoProfileForEmail(false);
-    setHasUnclaimedProfile(false);
-    setError(null);
-    setInterviewFilter("all");
-    setKindTab("all");
-  }
+      await loadDashboard(trimmed);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, loadDashboard]);
 
   const hasLoaded = interviewRows !== null && proposalRows !== null;
   const totalInterviews = interviewRows?.length ?? 0;
@@ -428,7 +405,7 @@ export default function ConsultantDashboardPage() {
             <div className="space-y-2">
               <h1 className="text-2xl font-semibold tracking-tight text-zinc-950 md:text-3xl">Talent Dashboard</h1>
               <p className="text-sm leading-relaxed text-zinc-600">
-                Enter your email to view interview requests and engagement proposals tied to your Procal talent profile.
+                View interview requests and engagement proposals tied to your Procal talent profile.
               </p>
             </div>
             {dashboardEmail != null ? (
@@ -449,45 +426,17 @@ export default function ConsultantDashboardPage() {
                     </Link>
                   </>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={handleChangeEmail}
-                  className="self-start text-sm font-medium text-orange-700 underline-offset-2 hover:underline sm:self-center"
-                >
-                  Change email
-                </button>
               </div>
             ) : null}
           </div>
           {dashboardEmail != null ? (
-            <p className="text-xs text-zinc-500">Showing activity for: {dashboardEmail}</p>
+            <p className="text-xs text-zinc-500">Showing talent profile for {dashboardEmail}</p>
           ) : null}
         </header>
 
-        <form
-          onSubmit={handleSubmit}
-          className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-zinc-50/40 p-5 md:flex-row md:items-end md:gap-4 md:p-6"
-        >
-          <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-            <span className="font-medium text-zinc-800">Profile contact email</span>
-            <input
-              required
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              placeholder="you@example.com"
-              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none ring-zinc-950 placeholder:text-zinc-400 focus:ring-2"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={loading}
-            className="shrink-0 rounded-full bg-zinc-950 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 disabled:opacity-60"
-          >
-            {loading ? "Loading…" : "Load dashboard"}
-          </button>
-        </form>
+        {loading ? (
+          <p className="text-sm text-zinc-500">Loading your dashboard…</p>
+        ) : null}
 
         {hasLoaded && !noProfileForEmail && hasUnclaimedProfile ? (
           <div className="flex flex-col gap-3 rounded-2xl border border-amber-200/90 bg-amber-50/80 px-5 py-4 md:flex-row md:items-center md:justify-between md:px-6">

@@ -1,8 +1,11 @@
 import { AppTopNav } from "@/components/app-top-nav";
 import { InterviewRequestForm } from "@/components/interview-request-form";
+import { requireCompany } from "@/lib/require-role";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
+export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -10,6 +13,7 @@ type PageProps = {
 
 export default async function RequestInterviewPage({ params }: PageProps) {
   const { id } = await params;
+  await requireCompany({ returnPath: `/consultants/${id}/request-interview` });
 
   const { data, error } = await supabase
     .from("resources")

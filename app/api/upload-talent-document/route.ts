@@ -11,10 +11,10 @@
  */
 
 import { createServiceRoleSupabase } from "@/lib/supabase-service-role";
+import { TALENT_DOCUMENTS_BUCKET } from "@/lib/storage-buckets";
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 
-const BUCKET = "talent-documents";
 const MAX_BYTES = 10 * 1024 * 1024;
 
 const DOC_TYPES = ["cv", "id_front", "id_back"] as const;
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 
   if (file.size <= 0 || file.size > MAX_BYTES) {
     return NextResponse.json(
-      { success: false, error: `File must be under ${MAX_BYTES / (1024 * 1024)}MB` },
+      { success: false, error: "File is too large. Max size is 10MB." },
       { status: 400 },
     );
   }
@@ -90,7 +90,13 @@ export async function POST(request: Request) {
   const ext = extForFile(docType, file.type);
   if (ext == null) {
     return NextResponse.json(
-      { success: false, error: "Unsupported file type for this document slot" },
+      {
+        success: false,
+        error:
+          docType === "cv"
+            ? "Invalid file type. CV allows: pdf, doc, docx."
+            : "Invalid file type. ID allows: jpg, jpeg, png, webp, pdf.",
+      },
       { status: 400 },
     );
   }
@@ -129,7 +135,7 @@ export async function POST(request: Request) {
   const token = randomBytes(8).toString("hex");
   const objectPath = `${row.id}/${docType}/${Date.now()}-${token}.${ext}`;
 
-  const { error: upErr } = await admin.storage.from(BUCKET).upload(objectPath, buf, {
+  const { error: upErr } = await admin.storage.from(TALENT_DOCUMENTS_BUCKET).upload(objectPath, buf, {
     contentType: file.type,
     upsert: true,
   });
@@ -141,8 +147,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            'Storage bucket "talent-documents" is missing or not accessible. Create a private bucket with that exact name in the Supabase Dashboard, then retry.',
+          error: "Storage bucket talent-documents is missing. Create it in Supabase Storage.",
         },
         { status: 503 },
       );
@@ -158,7 +163,7 @@ export async function POST(request: Request) {
 
   if (dbErr) {
     console.error("[upload-talent-document] db", dbErr);
-    await admin.storage.from(BUCKET).remove([objectPath]).catch(() => {});
+    await admin.storage.from(TALENT_DOCUMENTS_BUCKET).remove([objectPath]).catch(() => {});
     return NextResponse.json({ success: false, error: "Could not save document path" }, { status: 500 });
   }
 

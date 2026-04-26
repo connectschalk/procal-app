@@ -5,9 +5,8 @@
  */
 
 import { createServiceRoleSupabase } from "@/lib/supabase-service-role";
+import { TALENT_DOCUMENTS_BUCKET } from "@/lib/storage-buckets";
 import { NextResponse } from "next/server";
-
-const BUCKET = "talent-documents";
 
 const DOC_TYPES = ["cv", "id_front", "id_back"] as const;
 type DocType = (typeof DOC_TYPES)[number];
@@ -79,7 +78,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ url: null }, { status: 200 });
   }
 
-  const { data: signed, error: signErr } = await admin.storage.from(BUCKET).createSignedUrl(path, 60 * 15);
+  const { data: signed, error: signErr } = await admin.storage.from(TALENT_DOCUMENTS_BUCKET).createSignedUrl(path, 60 * 15);
   if (signErr || signed?.signedUrl == null) {
     return NextResponse.json({ url: null }, { status: 200 });
   }

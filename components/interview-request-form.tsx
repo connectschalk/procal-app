@@ -8,7 +8,7 @@ import {
 import { sendEmailClient } from "@/lib/send-email-client";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 const ACCENT = "#ff6a00";
 
@@ -27,12 +27,48 @@ export function InterviewRequestForm({
   const [companyName, setCompanyName] = useState("");
   const [requesterName, setRequesterName] = useState("");
   const [requesterEmail, setRequesterEmail] = useState("");
+  const [companyProfileLoading, setCompanyProfileLoading] = useState(true);
+  const [companyProfileReady, setCompanyProfileReady] = useState(false);
+  const [companyProfileError, setCompanyProfileError] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [pickedSlots, setPickedSlots] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      setCompanyProfileLoading(true);
+      setCompanyProfileError(null);
+      const res = await fetch("/api/update-company-profile", { cache: "no-store" });
+      const json = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        error?: string;
+        profile?: { company_name?: string | null; contact_person?: string | null; contact_email?: string | null } | null;
+      };
+      if (cancelled) return;
+      if (!res.ok || json.success !== true) {
+        setCompanyProfileLoading(false);
+        setCompanyProfileReady(false);
+        setCompanyProfileError(json.error ?? "Could not load your company profile.");
+        return;
+      }
+      const company = json.profile?.company_name?.trim() ?? "";
+      const person = json.profile?.contact_person?.trim() ?? "";
+      const email = json.profile?.contact_email?.trim() ?? "";
+      const complete = company !== "" && person !== "" && email !== "";
+      setCompanyName(company);
+      setRequesterName(person);
+      setRequesterEmail(email);
+      setCompanyProfileReady(complete);
+      setCompanyProfileLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -46,6 +82,16 @@ export function InterviewRequestForm({
       setSubmitting(false);
       return;
     }
+    if (!companyProfileReady) {
+      setError("Complete your company profile first.");
+      setSubmitting(false);
+      return;
+    }
+    if (message.trim() === "") {
+      setError("Message is required.");
+      setSubmitting(false);
+      return;
+    }
 
     const { proposed_slot_1, proposed_slot_2, proposed_slot_3 } = slotsToProposedColumns(pickedSlots);
 
@@ -55,7 +101,7 @@ export function InterviewRequestForm({
         company_name: companyName,
         requester_name: requesterName,
         requester_email: requesterEmail,
-        message: message.trim() || null,
+        message: message.trim(),
         proposed_slot_1,
         proposed_slot_2,
         proposed_slot_3,
@@ -81,7 +127,7 @@ export function InterviewRequestForm({
       resourceNameRaw?.trim() || consultantName.trim() || "";
 
     // Best-effort MVP: notify requester by email; DB insert already succeeded.
-    const companyForEmail = companyName.trim() || "there";
+    const companyForEmail = companyName.trim();
     const requesterTo = requesterEmail.trim();
     const submittedPreview = interviewRequestSubmittedEmail({
       companyName: companyForEmail,
@@ -126,9 +172,6 @@ export function InterviewRequestForm({
     }
 
     setSuccess(true);
-    setCompanyName("");
-    setRequesterName("");
-    setRequesterEmail("");
     setMessage("");
     setPickedSlots([]);
   }
@@ -162,8 +205,35 @@ export function InterviewRequestForm({
           </Link>
         </div>
         <p className="mt-4 text-xs leading-relaxed text-white/45">
-          Use the same email address you submitted with to open your company dashboard.
+          You can track this request from your company dashboard.
         </p>
+      </div>
+    );
+  }
+
+  if (companyProfileLoading) {
+    return (
+      <div className={glassCard}>
+        <p className="text-sm text-white/60">Loading company profile...</p>
+      </div>
+    );
+  }
+
+  if (!companyProfileReady) {
+    return (
+      <div className={`${glassCard} border-amber-500/30 bg-amber-950/20`}>
+        <p className="text-base font-semibold text-amber-100">Complete your company profile first</p>
+        <p className="mt-2 text-sm text-white/70">
+          Before sending interview requests, add your company name, contact person, and contact email.
+        </p>
+        {companyProfileError ? <p className="mt-2 text-sm text-red-200">{companyProfileError}</p> : null}
+        <Link
+          href="/company?completeProfile=1"
+          className="mt-4 inline-flex min-h-11 items-center justify-center rounded-2xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:brightness-105"
+          style={{ backgroundColor: ACCENT }}
+        >
+          Complete company profile
+        </Link>
       </div>
     );
   }
@@ -193,52 +263,22 @@ export function InterviewRequestForm({
           ) : null}
         </div>
 
-        <div className="space-y-4 border-t border-white/10 pt-5">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-white/45">Contact details</p>
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="font-medium text-white/55">Company</span>
-            <input
-              required
-              type="text"
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              className={inputClass}
-              autoComplete="organization"
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="font-medium text-white/55">Your name</span>
-            <input
-              required
-              type="text"
-              value={requesterName}
-              onChange={(e) => setRequesterName(e.target.value)}
-              className={inputClass}
-              autoComplete="name"
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="font-medium text-white/55">Work email</span>
-            <input
-              required
-              type="email"
-              value={requesterEmail}
-              onChange={(e) => setRequesterEmail(e.target.value)}
-              className={inputClass}
-              autoComplete="email"
-            />
-          </label>
+        <div className="space-y-1 border-t border-white/10 pt-5 text-sm">
+          <p className="text-white/70">
+            Requesting as <span className="font-semibold text-white">{companyName}</span> ·{" "}
+            <span className="font-semibold text-white">{requesterName}</span>
+          </p>
+          <p className="text-xs text-white/45">Confirmation will be sent to {requesterEmail}</p>
         </div>
 
         <label className="flex flex-col gap-2 text-sm">
-          <span className="font-medium text-white/55">Add a message (optional)</span>
+          <span className="font-medium text-white/55">Message</span>
           <textarea
+            required
             rows={3}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Role, timeline, or context for the interview"
+            placeholder="Share the role, timeline, or context for the interview."
             className={`${inputClass} resize-y`}
           />
         </label>

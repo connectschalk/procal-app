@@ -1,6 +1,9 @@
 "use client";
 
 import { AppTopNav } from "@/components/app-top-nav";
+import { createInterviewIcs } from "@/lib/calendar-invite";
+import { interviewAcceptedEmail } from "@/lib/email-placeholders";
+import { sendEmailClient } from "@/lib/send-email-client";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -10,11 +13,16 @@ type InterviewRequestRow = {
   resource_id: string;
   company_name: string;
   requester_name: string;
+  requester_email: string;
   message: string | null;
   proposed_slot_1: string | null;
   proposed_slot_2: string | null;
   proposed_slot_3: string | null;
   selected_slot: string | null;
+  decline_message: string | null;
+  alternative_slots: string[] | null;
+  reschedule_message: string | null;
+  reschedule_slots: string[] | null;
   status: string;
   created_at: string;
   consultant_name: string | null;
@@ -153,6 +161,23 @@ function summarizeProposals(rows: EngagementProposalRow[]) {
   return { total: rows.length, accepted };
 }
 
+function proposedSlots(row: InterviewRequestRow): string[] {
+  return [row.proposed_slot_1, row.proposed_slot_2, row.proposed_slot_3].filter(
+    (slot): slot is string => slot != null && slot.trim() !== "",
+  );
+}
+
+function actionableSlots(row: InterviewRequestRow): string[] {
+  const s = row.status.toLowerCase();
+  if (s === "reschedule_requested") {
+    return (row.reschedule_slots ?? []).filter((slot) => slot.trim() !== "");
+  }
+  if (s === "declined_with_alternatives") {
+    return (row.alternative_slots ?? []).filter((slot) => slot.trim() !== "");
+  }
+  return proposedSlots(row);
+}
+
 export default function ConsultantDashboardPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [interviewRows, setInterviewRows] = useState<InterviewRequestRow[] | null>(null);
@@ -163,6 +188,12 @@ export default function ConsultantDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [interviewFilter, setInterviewFilter] = useState<InterviewStatusFilter>("all");
   const [kindTab, setKindTab] = useState<KindTab>("all");
+  const [pendingSlotByInterviewId, setPendingSlotByInterviewId] = useState<Record<string, string>>({});
+  const [decisionBusyByInterviewId, setDecisionBusyByInterviewId] = useState<Record<string, boolean>>({});
+  const [decisionErrorByInterviewId, setDecisionErrorByInterviewId] = useState<Record<string, string>>({});
+  const [declineMessageByInterviewId, setDeclineMessageByInterviewId] = useState<Record<string, string>>({});
+  const [altSlotsByInterviewId, setAltSlotsByInterviewId] = useState<Record<string, [string, string, string]>>({});
+  const [declinePanelByInterviewId, setDeclinePanelByInterviewId] = useState<Record<string, boolean>>({});
   const [talentName, setTalentName] = useState<string>("");
   const [onboarding, setOnboarding] = useState<OnboardingSummary>({
     profileComplete: false,
@@ -185,11 +216,132 @@ export default function ConsultantDashboardPage() {
   const filteredInterviews = useMemo(() => {
     if (interviewRows == null) return [];
     if (interviewFilter === "all") return interviewRows;
-    return interviewRows.filter((r) => r.status.toLowerCase() === interviewFilter);
+    return interviewRows.filter((r) => {
+      const s = r.status.toLowerCase();
+      if (interviewFilter === "requested") return s === "requested" || s === "reschedule_requested";
+      if (interviewFilter === "declined") return s === "declined" || s === "declined_with_alternatives";
+      return s === interviewFilter;
+    });
   }, [interviewRows, interviewFilter]);
 
   const showInterviews = kindTab === "all" || kindTab === "interviews";
   const showProposals = kindTab === "all" || kindTab === "proposals";
+
+  const setInterviewDecisionBusy = useCallback((interviewId: string, busy: boolean) => {
+    setDecisionBusyByInterviewId((prev) => ({ ...prev, [interviewId]: busy }));
+  }, []);
+
+  const acceptInterview = useCallback(
+    async (row: InterviewRequestRow, chosenSlot: string) => {
+      setInterviewDecisionBusy(row.id, true);
+      setDecisionErrorByInterviewId((prev) => ({ ...prev, [row.id]: "" }));
+      const { error: updateError } = await supabase
+        .from("interview_requests")
+        .update({
+          status: "accepted",
+          selected_slot: chosenSlot,
+          decline_message: null,
+          alternative_slots: null,
+          reschedule_message: null,
+          reschedule_slots: null,
+        })
+        .eq("id", row.id);
+      if (updateError != null) {
+        setInterviewDecisionBusy(row.id, false);
+        setDecisionErrorByInterviewId((prev) => ({
+          ...prev,
+          [row.id]: updateError.message || "Could not accept interview request.",
+        }));
+        return;
+      }
+      setInterviewRows((prev) =>
+        prev == null
+          ? prev
+          : prev.map((item) =>
+              item.id === row.id ? { ...item, status: "accepted", selected_slot: chosenSlot } : item,
+            ),
+      );
+      // Best-effort: status update must remain successful even if email sending fails.
+      const acceptedEmail = interviewAcceptedEmail({
+        companyName: row.company_name,
+        consultantName: profileLabel(row.consultant_name),
+        selectedSlot: chosenSlot,
+      });
+      let icsAttachment: { filename: string; content: string } | null = null;
+      try {
+        const ics = createInterviewIcs({
+          title: `Procal interview — ${profileLabel(row.consultant_name)}`,
+          description: `Interview confirmed for ${row.company_name}. Requester: ${row.requester_name || "Company contact"}.`,
+          start: chosenSlot,
+          durationMinutes: 30,
+          organizerEmail: "info@procal.co.za",
+          attendeeEmail: row.requester_email.trim(),
+        });
+        icsAttachment = { filename: ics.filename, content: ics.content };
+      } catch (icsError) {
+        console.error("[talent-dashboard] could not generate interview ics", icsError);
+      }
+      const acceptedSend = await sendEmailClient({
+        to: row.requester_email.trim(),
+        subject: acceptedEmail.subject,
+        text: `${acceptedEmail.body}\n\nRequester: ${row.requester_name || "Company contact"}\nCompany: ${row.company_name}`,
+        ...(icsAttachment != null ? { attachments: [icsAttachment] } : {}),
+      });
+      if (!acceptedSend.ok) {
+        console.error("[talent-dashboard] send-email failed (accepted)", acceptedSend);
+      }
+      setInterviewDecisionBusy(row.id, false);
+      setPendingSlotByInterviewId((prev) => ({ ...prev, [row.id]: chosenSlot }));
+    },
+    [setInterviewDecisionBusy, supabase],
+  );
+
+  const sendAlternativeTimes = useCallback(
+    async (row: InterviewRequestRow) => {
+      const slots = (altSlotsByInterviewId[row.id] ?? ["", "", ""])
+        .map((v) => v.trim())
+        .filter((v) => v !== "");
+      if (slots.length === 0) {
+        setDecisionErrorByInterviewId((prev) => ({ ...prev, [row.id]: "Add at least one alternative time." }));
+        return;
+      }
+      setInterviewDecisionBusy(row.id, true);
+      setDecisionErrorByInterviewId((prev) => ({ ...prev, [row.id]: "" }));
+      const { error: updateError } = await supabase
+        .from("interview_requests")
+        .update({
+          status: "declined_with_alternatives",
+          decline_message: (declineMessageByInterviewId[row.id] ?? "").trim() || null,
+          alternative_slots: slots,
+        })
+        .eq("id", row.id);
+      if (updateError != null) {
+        setInterviewDecisionBusy(row.id, false);
+        setDecisionErrorByInterviewId((prev) => ({
+          ...prev,
+          [row.id]: updateError.message || "Could not send alternatives.",
+        }));
+        return;
+      }
+      setInterviewRows((prev) =>
+        prev == null
+          ? prev
+          : prev.map((item) =>
+              item.id === row.id
+                ? {
+                    ...item,
+                    status: "declined_with_alternatives",
+                    decline_message: (declineMessageByInterviewId[row.id] ?? "").trim() || null,
+                    alternative_slots: slots,
+                  }
+                : item,
+            ),
+      );
+      setInterviewDecisionBusy(row.id, false);
+      setDeclinePanelByInterviewId((prev) => ({ ...prev, [row.id]: false }));
+    },
+    [altSlotsByInterviewId, declineMessageByInterviewId, setInterviewDecisionBusy, supabase],
+  );
 
   const loadDashboard = useCallback(async (trimmed: string) => {
     setLoading(true);
@@ -198,6 +350,12 @@ export default function ConsultantDashboardPage() {
     setHasUnclaimedProfile(false);
     setInterviewFilter("all");
     setKindTab("all");
+    setPendingSlotByInterviewId({});
+    setDecisionBusyByInterviewId({});
+    setDecisionErrorByInterviewId({});
+    setDeclineMessageByInterviewId({});
+    setAltSlotsByInterviewId({});
+    setDeclinePanelByInterviewId({});
 
     const { data: resourceRows, error: resourcesError } = await supabase
       .from("resources")
@@ -345,7 +503,7 @@ export default function ConsultantDashboardPage() {
       supabase
         .from("interview_requests")
         .select(
-          "id, resource_id, company_name, requester_name, message, proposed_slot_1, proposed_slot_2, proposed_slot_3, selected_slot, status, created_at",
+          "id, resource_id, company_name, requester_name, requester_email, message, proposed_slot_1, proposed_slot_2, proposed_slot_3, selected_slot, decline_message, alternative_slots, reschedule_message, reschedule_slots, status, created_at",
         )
         .in("resource_id", resourceIds)
         .order("created_at", { ascending: false }),
@@ -389,11 +547,20 @@ export default function ConsultantDashboardPage() {
       resource_id: r.resource_id as string,
       company_name: r.company_name as string,
       requester_name: (r.requester_name as string) ?? "",
+      requester_email: (r.requester_email as string) ?? "",
       message: (r.message as string | null) ?? null,
       proposed_slot_1: (r.proposed_slot_1 as string | null) ?? null,
       proposed_slot_2: (r.proposed_slot_2 as string | null) ?? null,
       proposed_slot_3: (r.proposed_slot_3 as string | null) ?? null,
       selected_slot: (r.selected_slot as string | null) ?? null,
+      decline_message: (r.decline_message as string | null) ?? null,
+      alternative_slots: Array.isArray(r.alternative_slots)
+        ? r.alternative_slots.filter((v): v is string => typeof v === "string")
+        : null,
+      reschedule_message: (r.reschedule_message as string | null) ?? null,
+      reschedule_slots: Array.isArray(r.reschedule_slots)
+        ? r.reschedule_slots.filter((v): v is string => typeof v === "string")
+        : null,
       status: (r.status as string) ?? "requested",
       created_at: (r.created_at as string) ?? "",
     }));
@@ -692,10 +859,18 @@ export default function ConsultantDashboardPage() {
                 ) : (
                   <ul className="flex flex-col gap-4">
                     {filteredInterviews.map((row) => {
+                      const normalizedStatus = row.status.toLowerCase();
                       const accepted =
-                        row.status.toLowerCase() === "accepted" &&
+                        normalizedStatus === "accepted" &&
                         row.selected_slot != null &&
                         String(row.selected_slot).trim() !== "";
+                      const canRespond = normalizedStatus === "requested" || normalizedStatus === "reschedule_requested";
+                      const proposed = actionableSlots(row);
+                      const chosenSlot =
+                        pendingSlotByInterviewId[row.id] ?? (canRespond ? null : row.selected_slot ?? null);
+                      const decisionBusy = decisionBusyByInterviewId[row.id] === true;
+                      const decisionError = decisionErrorByInterviewId[row.id];
+                      const declinePanelOpen = declinePanelByInterviewId[row.id] === true;
                       return (
                         <li
                           key={row.id}
@@ -743,22 +918,122 @@ export default function ConsultantDashboardPage() {
                           </div>
 
                           <div className="mt-4">
-                            <h3 className="text-xs font-medium uppercase tracking-wide text-white/45">Proposed slots</h3>
+                            <h3 className="text-xs font-medium uppercase tracking-wide text-white/45">
+                              {normalizedStatus === "reschedule_requested" ? "Reschedule slots" : "Proposed slots"}
+                            </h3>
                             <div className="mt-2 grid gap-2 text-sm text-white/85 sm:grid-cols-3">
-                              <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
-                                <span className="text-xs text-white/45">Slot 1</span>
-                                <p className="font-medium">{formatSlot(row.proposed_slot_1)}</p>
+                              {proposed.length === 0 ? (
+                                <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-white/55 sm:col-span-3">
+                                  No proposed slots were provided.
+                                </div>
+                              ) : (
+                                proposed.map((slot, idx) => {
+                                  const selected = chosenSlot != null && chosenSlot === slot;
+                                  return (
+                                    <button
+                                      key={`${row.id}-${slot}-${idx}`}
+                                      type="button"
+                                      disabled={!canRespond || decisionBusy}
+                                      onClick={() => {
+                                        if (!canRespond || decisionBusy) return;
+                                        setPendingSlotByInterviewId((prev) => ({ ...prev, [row.id]: slot }));
+                                      }}
+                                      className={`rounded-lg border px-3 py-2 text-left transition ${
+                                        selected
+                                          ? "border-orange-500 bg-orange-500/10"
+                                          : "border-white/10 bg-white/[0.04] hover:border-white/20"
+                                      } ${!canRespond ? "cursor-default" : ""}`}
+                                    >
+                                      <span className="text-xs text-white/45">Slot {idx + 1}</span>
+                                      <p className="font-medium">{formatSlot(slot)}</p>
+                                    </button>
+                                  );
+                                })
+                              )}
+                            </div>
+                            {canRespond ? (
+                              <p className="mt-2 text-xs text-white/60">
+                                Select one time to accept the interview.
+                              </p>
+                            ) : null}
+                            {normalizedStatus === "reschedule_requested" && row.reschedule_message?.trim() ? (
+                              <p className="mt-2 text-xs text-amber-200/90">Company message: {row.reschedule_message}</p>
+                            ) : null}
+                            {normalizedStatus === "declined_with_alternatives" && row.decline_message?.trim() ? (
+                              <p className="mt-2 text-xs text-amber-200/90">Your message: {row.decline_message}</p>
+                            ) : null}
+                          </div>
+
+                          {canRespond ? (
+                            <div className="mt-4 flex flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-end">
+                              <button
+                                type="button"
+                                disabled={decisionBusy || chosenSlot == null}
+                                onClick={() => {
+                                  if (chosenSlot == null || decisionBusy) return;
+                                  void acceptInterview(row, chosenSlot);
+                                }}
+                                className="inline-flex h-10 items-center justify-center rounded-xl bg-[#ff6a00] px-4 text-sm font-semibold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {decisionBusy ? "Saving..." : normalizedStatus === "reschedule_requested" ? "Accept reschedule slot" : "Accept selected slot"}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={decisionBusy}
+                                onClick={() => {
+                                  if (decisionBusy) return;
+                                  setDeclinePanelByInterviewId((prev) => ({ ...prev, [row.id]: !declinePanelOpen }));
+                                }}
+                                className="inline-flex h-10 items-center justify-center rounded-xl border border-white/20 bg-white/[0.04] px-4 text-sm font-semibold text-white/85 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {declinePanelOpen ? "Cancel" : "Decline with alternatives"}
+                              </button>
+                            </div>
+                          ) : null}
+                          {canRespond && declinePanelOpen ? (
+                            <div className="mt-3 rounded-xl border border-white/10 bg-black/25 p-3">
+                              <label className="block text-xs font-medium uppercase tracking-wide text-white/45">
+                                Message
+                                <textarea
+                                  rows={2}
+                                  value={declineMessageByInterviewId[row.id] ?? ""}
+                                  onChange={(e) =>
+                                    setDeclineMessageByInterviewId((prev) => ({ ...prev, [row.id]: e.target.value }))
+                                  }
+                                  className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-orange-500/40"
+                                  placeholder="Share a short note with the company."
+                                />
+                              </label>
+                              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                                {[0, 1, 2].map((idx) => (
+                                  <input
+                                    key={`${row.id}-alt-${idx}`}
+                                    type="datetime-local"
+                                    value={(altSlotsByInterviewId[row.id] ?? ["", "", ""])[idx] ?? ""}
+                                    onChange={(e) =>
+                                      setAltSlotsByInterviewId((prev) => {
+                                        const current = [...(prev[row.id] ?? ["", "", ""])] as [string, string, string];
+                                        current[idx] = e.target.value;
+                                        return { ...prev, [row.id]: current };
+                                      })
+                                    }
+                                    className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none focus:border-orange-500/40"
+                                  />
+                                ))}
                               </div>
-                              <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
-                                <span className="text-xs text-white/45">Slot 2</span>
-                                <p className="font-medium">{formatSlot(row.proposed_slot_2)}</p>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
-                                <span className="text-xs text-white/45">Slot 3</span>
-                                <p className="font-medium">{formatSlot(row.proposed_slot_3)}</p>
+                              <div className="mt-3 flex justify-end">
+                                <button
+                                  type="button"
+                                  disabled={decisionBusy}
+                                  onClick={() => void sendAlternativeTimes(row)}
+                                  className="inline-flex h-9 items-center justify-center rounded-lg bg-[#ff6a00] px-3 text-xs font-semibold text-white transition hover:brightness-105 disabled:opacity-60"
+                                >
+                                  Send alternative times
+                                </button>
                               </div>
                             </div>
-                          </div>
+                          ) : null}
+                          {decisionError ? <p className="mt-3 text-sm text-red-300">{decisionError}</p> : null}
 
                           {accepted ? (
                             <p className="mt-4 text-sm font-medium text-[#ffb37a]">

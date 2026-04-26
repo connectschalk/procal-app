@@ -1,5 +1,7 @@
 import { AppTopNav } from "@/components/app-top-nav";
 import { PublicAvailabilityCalendar } from "@/components/public-availability-calendar";
+import { isCompanyProfileComplete } from "@/lib/company-profile";
+import { getCompanyProfileByUserId, getUserRoleById } from "@/lib/company-profile-server";
 import { getPublicTalentAvatarDisplay } from "@/lib/talent-avatar-library";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { supabase } from "@/lib/supabase";
@@ -124,10 +126,21 @@ export default async function ConsultantProfilePage({ params }: PageProps) {
 
   const requestInterviewPath = `/consultants/${id}/request-interview`;
   const proposeEngagementPath = `/consultants/${id}/propose-engagement`;
-  const requestInterviewHref =
-    user != null ? requestInterviewPath : `/login?next=${encodeURIComponent(requestInterviewPath)}`;
-  const proposeEngagementHref =
-    user != null ? proposeEngagementPath : `/login?next=${encodeURIComponent(proposeEngagementPath)}`;
+  let requestInterviewHref = user != null ? requestInterviewPath : `/login?next=${encodeURIComponent(requestInterviewPath)}`;
+  let proposeEngagementHref = user != null ? proposeEngagementPath : `/login?next=${encodeURIComponent(proposeEngagementPath)}`;
+  let companyNeedsProfileCompletion = false;
+  if (user != null) {
+    const role = await getUserRoleById(user.id);
+    const isCompanyUser = role === "company";
+    if (isCompanyUser) {
+      const companyProfile = await getCompanyProfileByUserId(user.id);
+      if (!isCompanyProfileComplete(companyProfile)) {
+        companyNeedsProfileCompletion = true;
+        requestInterviewHref = "/company?completeProfile=1";
+        proposeEngagementHref = "/company?completeProfile=1";
+      }
+    }
+  }
 
   const { data, error } = await supabase
     .from("resources")
@@ -272,6 +285,12 @@ export default async function ConsultantProfilePage({ params }: PageProps) {
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/60">
               Request an interview or propose an engagement to start the process.
             </p>
+            {companyNeedsProfileCompletion ? (
+              <p className="mt-2 text-sm text-amber-200/90">
+                Complete your company profile before contacting talent.
+              </p>
+            ) : null}
+            {/* TODO: Later require active subscription/payment before allowing engagement actions. */}
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Link
                 href={requestInterviewHref}

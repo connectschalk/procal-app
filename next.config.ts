@@ -1,6 +1,26 @@
 import type { NextConfig } from "next";
 
+function resolveSupabaseHostname() {
+  const fallback = "fymfdphrgxkdtwfjbsrn.supabase.co";
+  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  if (!raw) return fallback;
+  try {
+    return new URL(raw).hostname || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: resolveSupabaseHostname(),
+        pathname: "/storage/v1/object/**",
+      },
+    ],
+  },
   async redirects() {
     return [
       {

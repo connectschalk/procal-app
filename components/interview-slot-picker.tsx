@@ -157,8 +157,9 @@ export function InterviewSlotPicker({
   resourceId,
   variant = "default",
 }: InterviewSlotPickerProps) {
-  const days = useMemo(() => getNext7Days(new Date()), []);
-  const [selectedDate, setSelectedDate] = useState<Date>(() => days[0] ?? new Date());
+  const [windowStartDate, setWindowStartDate] = useState<Date>(() => startOfLocalDay(new Date()));
+  const days = useMemo(() => getNext7Days(windowStartDate), [windowStartDate]);
+  const [selectedDate, setSelectedDate] = useState<Date>(() => startOfLocalDay(new Date()));
   const [durationMin, setDurationMin] = useState<InterviewDurationMin>(30);
   const [availability, setAvailability] = useState<AvailabilityState>({ status: "idle" });
   const slotMinutes = useMemo(() => slotMinutesList(), []);
@@ -216,9 +217,17 @@ export function InterviewSlotPicker({
     availability.status === "ready" ? availability : null;
 
   useEffect(() => {
-    if (availabilityReady == null) return;
-    if (isDaySelectable(selectedDate, availabilityReady)) return;
-    const next = days.find((d) => isDaySelectable(d, availabilityReady));
+    const inVisibleWindow = days.some((d) => sameLocalCalendarDay(d, selectedDate));
+    if (availabilityReady == null) {
+      if (!inVisibleWindow) {
+        queueMicrotask(() => {
+          setSelectedDate(days[0] ?? startOfLocalDay(new Date()));
+        });
+      }
+      return;
+    }
+    if (inVisibleWindow && isDaySelectable(selectedDate, availabilityReady)) return;
+    const next = days.find((d) => isDaySelectable(d, availabilityReady)) ?? days[0];
     if (next) {
       queueMicrotask(() => {
         setSelectedDate(next);
@@ -271,6 +280,15 @@ export function InterviewSlotPicker({
   const allDaysUnavailable =
     availabilityReady != null && days.every((d) => !isDaySelectable(d, availabilityReady));
 
+  const todayLocal = startOfLocalDay(new Date());
+  const todayIso = localIsoDate(todayLocal);
+  const canGoPrev = localIsoDate(addDays(windowStartDate, -7)) >= todayIso;
+
+  const prevNextClass =
+    variant === "booking"
+      ? "inline-flex items-center justify-center rounded-lg border border-white/15 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-white/85 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-35"
+      : "inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40";
+
   const noOpenSlotsThisDay =
     !selectedDayRestricted &&
     availabilityReady != null &&
@@ -297,20 +315,46 @@ export function InterviewSlotPicker({
           : "flex flex-col gap-5 md:flex-row md:items-stretch md:gap-6"
       }
     >
-      <div className={dayStripClass} aria-label="Choose a day">
-        {days.map((d) => {
+      <div className={variant === "booking" ? "space-y-2" : "space-y-2 md:w-[5.75rem] md:shrink-0"}>
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            disabled={!canGoPrev}
+            onClick={() => {
+              if (!canGoPrev) return;
+              setWindowStartDate((prev) => addDays(prev, -7));
+            }}
+            className={prevNextClass}
+            aria-label="Show previous 7 days"
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            onClick={() => setWindowStartDate((prev) => addDays(prev, 7))}
+            className={prevNextClass}
+            aria-label="Show next 7 days"
+          >
+            Next
+          </button>
+        </div>
+        <div className={dayStripClass} aria-label="Choose a day">
+          {days.map((d) => {
           const active = calendarDayKey(d) === selectedDateKey;
           const wk = new Intl.DateTimeFormat("en-ZA", { weekday: "short" }).format(d);
           const mon = new Intl.DateTimeFormat("en-ZA", { month: "short" }).format(d);
+          const past = localIsoDate(d) < todayIso;
           const before =
             availabilityReady != null && isBeforeAvailable(d, availabilityReady.availableFrom);
           const blocked = availabilityReady != null && isBlockedDay(d, availabilityReady.blockedIso);
-          const unavailable = before || blocked;
+          const unavailable = past || before || blocked;
           const fromLabel =
             availabilityReady?.availableFrom != null
               ? formatMediumDate(availabilityReady.availableFrom)
               : "";
-          const title = blocked
+          const title = past
+            ? "Unavailable"
+            : blocked
             ? "Unavailable"
             : before && fromLabel
               ? `Available from ${fromLabel}`
@@ -420,13 +464,20 @@ export function InterviewSlotPicker({
               <span className={`text-[11px] font-medium ${monClass}`}>{mon}</span>
             </button>
           );
-        })}
+          })}
+        </div>
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-3">
-        {variant === "booking" && allDaysUnavailable ? (
-          <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white/65">
-            This talent has limited availability. Try another day.
+        {allDaysUnavailable ? (
+          <p
+            className={
+              variant === "booking"
+                ? "rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white/65"
+                : "rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-700"
+            }
+          >
+            No available days in this range. Try next week.
           </p>
         ) : null}
 

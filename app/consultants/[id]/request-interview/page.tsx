@@ -1,10 +1,13 @@
 import { AppTopNav } from "@/components/app-top-nav";
 import { InterviewRequestForm } from "@/components/interview-request-form";
+import { isCompanyProfileComplete } from "@/lib/company-profile";
+import { getCompanyProfileByUserId } from "@/lib/company-profile-server";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { getPublicTalentAvatarDisplay } from "@/lib/talent-avatar-library";
 import { requireCompany } from "@/lib/require-role";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +39,17 @@ function truncateBio(s: string | null, max = 220): string | null {
 export default async function RequestInterviewPage({ params }: PageProps) {
   const { id } = await params;
   await requireCompany({ returnPath: `/consultants/${id}/request-interview` });
+  const supabaseServer = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabaseServer.auth.getUser();
+  if (user == null) {
+    redirect(`/login?next=${encodeURIComponent(`/consultants/${id}/request-interview`)}`);
+  }
+  const companyProfile = await getCompanyProfileByUserId(user.id);
+  if (!isCompanyProfileComplete(companyProfile)) {
+    redirect("/company?completeProfile=1");
+  }
 
   const { data, error } = await supabase
     .from("resources")

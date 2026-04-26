@@ -1,9 +1,12 @@
 import { AppTopNav } from "@/components/app-top-nav";
 import { EngagementProposalForm } from "@/components/engagement-proposal-form";
+import { isCompanyProfileComplete } from "@/lib/company-profile";
+import { getCompanyProfileByUserId } from "@/lib/company-profile-server";
 import { requireCompany } from "@/lib/require-role";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +17,17 @@ type PageProps = {
 export default async function ProposeEngagementPage({ params }: PageProps) {
   const { id } = await params;
   await requireCompany({ returnPath: `/consultants/${id}/propose-engagement` });
+  const supabaseServer = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabaseServer.auth.getUser();
+  if (user == null) {
+    redirect(`/login?next=${encodeURIComponent(`/consultants/${id}/propose-engagement`)}`);
+  }
+  const companyProfile = await getCompanyProfileByUserId(user.id);
+  if (!isCompanyProfileComplete(companyProfile)) {
+    redirect("/company?completeProfile=1");
+  }
 
   const { data, error } = await supabase
     .from("resources")

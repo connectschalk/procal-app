@@ -9,33 +9,21 @@ import type { User } from "@supabase/supabase-js";
 
 type NavRole = "company" | "consultant" | "admin";
 
-function navLinkClass(active: boolean, hero: boolean) {
-  if (hero) {
-    if (active) {
-      return "rounded-md bg-white/10 px-2.5 py-1.5 text-sm font-semibold text-white ring-1 ring-[#ff6a00]/50 transition-colors";
-    }
-    return "rounded-md px-2.5 py-1.5 text-sm font-medium text-white/75 transition-colors hover:bg-white/10 hover:text-white";
-  }
+function navLinkClass(active: boolean) {
   if (active) {
-    return "rounded-md bg-orange-50/90 px-2.5 py-1.5 text-sm font-semibold text-orange-700 ring-1 ring-orange-200/80 transition-colors";
+    return "rounded-md bg-white/10 px-2.5 py-1.5 text-sm font-semibold text-white ring-1 ring-[#ff6a00]/50 transition-colors";
   }
-  return "rounded-md px-2.5 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-zinc-900";
+  return "rounded-md px-2.5 py-1.5 text-sm font-medium text-white/75 transition-colors hover:bg-white/10 hover:text-white";
 }
 
-function navDivider(hero: boolean) {
-  return (
-    <span
-      className={`mx-1 hidden h-5 w-px sm:inline-block ${hero ? "bg-white/20" : "bg-zinc-200"}`}
-      aria-hidden
-    />
-  );
+function navDivider() {
+  return <span className="mx-1 hidden h-5 w-px bg-white/20 sm:inline-block" aria-hidden />;
 }
 
 export type AppTopNavVariant = "default" | "hero";
 
 export function AppTopNav({ variant = "default" }: { variant?: AppTopNavVariant }) {
   const pathname = usePathname() ?? "";
-  const hero = variant === "hero";
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [navRole, setNavRole] = useState<NavRole | null | undefined>(undefined);
@@ -101,70 +89,64 @@ export function AppTopNav({ variant = "default" }: { variant?: AppTopNavVariant 
 
   return (
     <header
-      className={
-        hero
-          ? "sticky top-0 z-50 border-b border-white/10 bg-black/30 backdrop-blur-md"
-          : "sticky top-0 z-50 border-b border-zinc-200 bg-white"
-      }
+      className="sticky top-0 z-50 w-full border-b border-white/10 bg-[#0B0B0D]"
+      data-nav-variant={variant}
     >
-      <nav className="mx-auto flex max-w-6xl flex-col gap-3 px-6 py-3.5 md:flex-row md:items-center md:justify-between md:px-10 md:py-4">
-        {hero ? (
-          <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-90">
-            <div
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold text-white shadow-md"
-              style={{ background: "linear-gradient(135deg, #ff6a00 0%, #ea580c 100%)" }}
-              aria-hidden
-            >
-              P
-            </div>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.32em] text-white">PROCAL</span>
-          </Link>
-        ) : (
-          <Link
-            href="/"
-            className="text-base font-semibold tracking-tight text-zinc-950 transition-colors hover:text-orange-600"
-          >
-            Procal
-          </Link>
-        )}
-        <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-          <Link href="/marketplace" className={navLinkClass(marketplaceActive, hero)}>
+      <nav className="mx-auto flex max-w-6xl flex-col gap-3 px-6 py-3.5 md:flex-row md:items-center md:justify-between md:px-8 md:py-4">
+        <Link
+          href="/"
+          className="mr-8 flex shrink-0 items-center self-start bg-transparent transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 focus-visible:ring-offset-0 md:self-center"
+          aria-label="Procal home"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- transparent PNG logo; avoid optimizer background quirks */}
+          <img
+            src="/logo.png"
+            alt="Procal logo"
+            width={200}
+            height={56}
+            className="h-7 w-auto max-h-7 object-contain md:h-8 md:max-h-8"
+            decoding="async"
+            fetchPriority="high"
+          />
+        </Link>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1 sm:gap-2 md:justify-end">
+          <Link href="/marketplace" className={navLinkClass(marketplaceActive)}>
             Marketplace
           </Link>
 
           {authUser == null ? (
             <>
-              {navDivider(hero)}
-              <Link href="/login" className={navLinkClass(loginActive, hero)}>
+              {navDivider()}
+              <Link href="/login" className={navLinkClass(loginActive)}>
                 Log in
               </Link>
-              <Link href="/signup" className={navLinkClass(signupActive, hero)}>
+              <Link href="/signup" className={navLinkClass(signupActive)}>
                 Sign up
               </Link>
             </>
           ) : null}
 
           {authUser != null && navRole === "company" ? (
-            <Link href="/company" className={navLinkClass(companyDashboardActive, hero)}>
+            <Link href="/company?section=engagements" className={navLinkClass(companyDashboardActive)}>
               Company Dashboard
             </Link>
           ) : null}
 
           {authUser != null && navRole === "consultant" ? (
-            <Link href="/talent" className={navLinkClass(talentDashboardActive, hero)}>
+            <Link href="/talent" className={navLinkClass(talentDashboardActive)}>
               Talent Dashboard
             </Link>
           ) : null}
 
           {authUser != null && navRole === "admin" ? (
             <>
-              <Link href="/admin/resources" className={navLinkClass(adminResourcesActive, hero)}>
+              <Link href="/admin/resources" className={navLinkClass(adminResourcesActive)}>
                 Admin
               </Link>
-              <Link href="/admin/interviews" className={navLinkClass(adminInterviewsActive, hero)}>
+              <Link href="/admin/interviews" className={navLinkClass(adminInterviewsActive)}>
                 Interviews
               </Link>
-              <Link href="/admin/engagements" className={navLinkClass(adminEngagementsActive, hero)}>
+              <Link href="/admin/engagements" className={navLinkClass(adminEngagementsActive)}>
                 Engagements
               </Link>
             </>
@@ -172,25 +154,23 @@ export function AppTopNav({ variant = "default" }: { variant?: AppTopNavVariant 
 
           {authUser != null ? (
             <>
-              {navDivider(hero)}
-              <span
-                className={`max-w-[10rem] truncate text-xs sm:max-w-[14rem] ${hero ? "text-white/55" : "text-zinc-500"}`}
-                title={authUser.email ?? ""}
-              >
-                {authUser.email}
-              </span>
-              <form action={signOut}>
-                <button
-                  type="submit"
-                  className={
-                    hero
-                      ? "rounded-md px-2.5 py-1.5 text-sm font-semibold text-white ring-1 ring-white/25 transition-colors hover:bg-white/10"
-                      : "rounded-md px-2.5 py-1.5 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50"
-                  }
+              {navDivider()}
+              <div className="relative group">
+                <form action={signOut}>
+                  <button
+                    type="submit"
+                    className="rounded-md px-2.5 py-1.5 text-sm font-semibold text-white ring-1 ring-white/25 transition-colors hover:bg-white/10"
+                  >
+                    Log out
+                  </button>
+                </form>
+                <span
+                  className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-[#111] px-3 py-1.5 text-xs text-gray-300 opacity-0 shadow-lg transition duration-200 group-hover:opacity-100"
+                  title={authUser.email ?? ""}
                 >
-                  Log out
-                </button>
-              </form>
+                  {authUser.email}
+                </span>
+              </div>
             </>
           ) : null}
         </div>

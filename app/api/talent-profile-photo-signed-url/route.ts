@@ -1,7 +1,6 @@
 import { createServiceRoleSupabase } from "@/lib/supabase-service-role";
+import { TALENT_PROFILE_PHOTOS_BUCKET } from "@/lib/storage-buckets";
 import { NextResponse } from "next/server";
-
-const BUCKET = "talent-profile-photos";
 
 type Body = { email?: unknown };
 
@@ -59,7 +58,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ url: null }, { status: 200 });
   }
 
-  const { data: signed, error: signErr } = await admin.storage.from(BUCKET).createSignedUrl(path, 60 * 30);
+  const { data: signed, error: signErr } = await admin.storage.from(TALENT_PROFILE_PHOTOS_BUCKET).createSignedUrl(path, 60 * 30);
   if (signErr || signed?.signedUrl == null) {
     return NextResponse.json({ url: null }, { status: 200 });
   }

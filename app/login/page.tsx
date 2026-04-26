@@ -13,7 +13,7 @@ const HERO_IMAGE =
   "https://images.unsplash.com/photo-1659177444041-94305594457e?auto=format&fit=crop&w=2400&q=88";
 
 const inputClass =
-  "min-w-0 rounded-xl border border-white/10 bg-zinc-900/70 px-4 py-3 text-sm text-zinc-100 shadow-inner shadow-black/20 outline-none transition placeholder:text-zinc-500 focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25";
+  "min-w-0 rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-zinc-100 shadow-inner shadow-black/20 outline-none transition placeholder:text-zinc-500 focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25";
 
 function CloseIcon({ className }: { className?: string }) {
   return (
@@ -81,7 +81,7 @@ export default function LoginPage() {
   }
 
   const modalClass =
-    "relative w-full max-w-md min-w-0 rounded-3xl border border-white/10 bg-[#0b0f1a]/90 p-8 shadow-2xl shadow-black/50 backdrop-blur-xl md:p-10";
+    "relative w-full max-w-md min-w-0 rounded-3xl border border-white/10 bg-[#111111]/95 p-8 shadow-2xl shadow-black/50 backdrop-blur-xl md:p-10";
 
   return (
     <div className="relative min-h-screen min-h-dvh overflow-y-auto bg-zinc-950 text-zinc-100">
@@ -102,7 +102,7 @@ export default function LoginPage() {
         />
       </div>
 
-      <div className="pointer-events-none fixed inset-0 z-[1] bg-black/60 backdrop-blur-md" aria-hidden />
+      <div className="pointer-events-none fixed inset-0 z-[1] bg-black/70 backdrop-blur-md" aria-hidden />
 
       <div className="relative z-10 flex min-h-screen min-h-dvh items-center justify-center px-4 py-10 sm:px-6 sm:py-12">
         <div className={modalClass}>
@@ -130,7 +130,7 @@ export default function LoginPage() {
           <h1 className="text-center text-2xl font-bold leading-tight tracking-tight text-white md:text-3xl">
             Welcome back
           </h1>
-          <p className="mt-3 text-center text-sm leading-relaxed text-white/60 md:text-base">
+          <p className="mt-3 text-center text-sm leading-relaxed text-zinc-400 md:text-base">
             Log in to continue to ProCal
           </p>
 

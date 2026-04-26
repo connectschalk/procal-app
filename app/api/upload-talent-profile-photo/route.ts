@@ -1,8 +1,8 @@
 import { createServiceRoleSupabase } from "@/lib/supabase-service-role";
+import { TALENT_PROFILE_PHOTOS_BUCKET } from "@/lib/storage-buckets";
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 
-const BUCKET = "talent-profile-photos";
 const MAX_BYTES = 5 * 1024 * 1024;
 
 const ALLOWED = new Map<string, string>([
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   const email = emailRaw.trim();
   if (file.size <= 0 || file.size > MAX_BYTES) {
     return NextResponse.json(
-      { success: false, error: `File must be under ${MAX_BYTES / (1024 * 1024)}MB` },
+      { success: false, error: "File is too large. Max size is 5MB." },
       { status: 400 },
     );
   }
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   const ext = ALLOWED.get(file.type);
   if (ext == null) {
     return NextResponse.json(
-      { success: false, error: "Only JPEG, PNG, or WebP images are allowed" },
+      { success: false, error: "Invalid file type. Allowed types: jpg, jpeg, png, webp" },
       { status: 400 },
     );
   }
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
   const token = randomBytes(8).toString("hex");
   const objectPath = `${row.id}/${Date.now()}-${token}.${ext}`;
 
-  const { error: upErr } = await admin.storage.from(BUCKET).upload(objectPath, buf, {
+  const { error: upErr } = await admin.storage.from(TALENT_PROFILE_PHOTOS_BUCKET).upload(objectPath, buf, {
     contentType: file.type,
     upsert: true,
   });
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
         {
           success: false,
           error:
-            'Storage bucket "talent-profile-photos" is missing or not accessible. Create a private bucket with that exact name in the Supabase Dashboard, then retry.',
+            "Storage bucket talent-profile-photos is missing. Create it in Supabase Storage.",
         },
         { status: 503 },
       );
@@ -117,12 +117,12 @@ export async function POST(request: Request) {
 
   if (dbErr) {
     console.error("[upload-talent-profile-photo] db", dbErr);
-    await admin.storage.from(BUCKET).remove([objectPath]).catch(() => {});
+    await admin.storage.from(TALENT_PROFILE_PHOTOS_BUCKET).remove([objectPath]).catch(() => {});
     return NextResponse.json({ success: false, error: "Could not save photo path" }, { status: 500 });
   }
 
   const { data: signed, error: signErr } = await admin.storage
-    .from(BUCKET)
+    .from(TALENT_PROFILE_PHOTOS_BUCKET)
     .createSignedUrl(objectPath, 60 * 60);
 
   if (signErr) {

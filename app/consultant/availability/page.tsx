@@ -13,6 +13,12 @@ type BlockedRow = {
   reason: string | null;
 };
 
+type ProgressStep = {
+  key: "profile" | "avatar" | "photo" | "cv" | "id_front" | "id_back" | "availability";
+  label: string;
+  done: boolean;
+};
+
 function formatDate(isoDate: string): string {
   const d = new Date(`${isoDate}T12:00:00`);
   if (Number.isNaN(d.getTime())) return isoDate;
@@ -226,6 +232,21 @@ export default function ConsultantAvailabilityPage() {
   const [ambiguous, setAmbiguous] = useState(false);
   const [notClaimed, setNotClaimed] = useState(false);
   const [canManage, setCanManage] = useState(false);
+  const [onboardingProgress, setOnboardingProgress] = useState<{
+    profile: boolean;
+    avatar: boolean;
+    photo: boolean;
+    cv: boolean;
+    idFront: boolean;
+    idBack: boolean;
+  }>({
+    profile: false,
+    avatar: false,
+    photo: false,
+    cv: false,
+    idFront: false,
+    idBack: false,
+  });
 
   const [saveFromBusy, setSaveFromBusy] = useState(false);
   const [defaultBlockReason, setDefaultBlockReason] = useState("");
@@ -248,6 +269,23 @@ export default function ConsultantAvailabilityPage() {
     }
     return m;
   }, [blockedRows]);
+  const progressSteps = useMemo<ProgressStep[]>(
+    () => [
+      { key: "profile", label: "Profile", done: onboardingProgress.profile },
+      { key: "avatar", label: "Avatar", done: onboardingProgress.avatar },
+      { key: "photo", label: "Photo", done: onboardingProgress.photo },
+      { key: "cv", label: "CV", done: onboardingProgress.cv },
+      { key: "id_front", label: "ID front", done: onboardingProgress.idFront },
+      { key: "id_back", label: "ID back", done: onboardingProgress.idBack },
+      {
+        key: "availability",
+        label: "Availability",
+        done: (availableFrom != null && availableFrom.trim() !== "") || blockedRows.length > 0,
+      },
+    ],
+    [onboardingProgress, availableFrom, blockedRows.length],
+  );
+  const nextStepIndex = progressSteps.findIndex((s) => !s.done);
 
   const todayIso = localIsoToday();
 
@@ -282,6 +320,14 @@ export default function ConsultantAvailabilityPage() {
       setAmbiguous(false);
       setNotClaimed(false);
       setCanManage(false);
+      setOnboardingProgress({
+        profile: false,
+        avatar: false,
+        photo: false,
+        cv: false,
+        idFront: false,
+        idBack: false,
+      });
       setResourceId(null);
       setTalentName("");
       setAvailableFrom("");
@@ -289,7 +335,9 @@ export default function ConsultantAvailabilityPage() {
 
       const { data, error: fetchError } = await supabase
         .from("resources")
-        .select("id, name, claimed, available_from")
+        .select(
+          "id, name, claimed, available_from, headline, bio, hourly_rate, location, avatar_key, profile_photo_path, cv_document_path, id_front_document_path, id_back_document_path",
+        )
         .ilike("contact_email", trimmed);
 
       setLoading(false);
@@ -317,6 +365,15 @@ export default function ConsultantAvailabilityPage() {
         name: string | null;
         claimed: boolean | null;
         available_from: string | null;
+        headline: string | null;
+        bio: string | null;
+        hourly_rate: number | null;
+        location: string | null;
+        avatar_key: string | null;
+        profile_photo_path: string | null;
+        cv_document_path: string | null;
+        id_front_document_path: string | null;
+        id_back_document_path: string | null;
       };
       setDashboardEmail(trimmed);
 
@@ -332,6 +389,19 @@ export default function ConsultantAvailabilityPage() {
       setVisibleMonth({ year: now.getFullYear(), month: now.getMonth() });
       const af = row.available_from;
       setAvailableFrom(af != null && String(af).trim() !== "" ? String(af).slice(0, 10) : "");
+      setOnboardingProgress({
+        profile:
+          Boolean(row.name && row.name.trim() !== "") &&
+          Boolean(row.headline && row.headline.trim() !== "") &&
+          Boolean(row.bio && row.bio.trim() !== "") &&
+          row.hourly_rate != null &&
+          Boolean(row.location && row.location.trim() !== ""),
+        avatar: Boolean(row.avatar_key && row.avatar_key.trim() !== ""),
+        photo: Boolean(row.profile_photo_path && row.profile_photo_path.trim() !== ""),
+        cv: Boolean(row.cv_document_path && row.cv_document_path.trim() !== ""),
+        idFront: Boolean(row.id_front_document_path && row.id_front_document_path.trim() !== ""),
+        idBack: Boolean(row.id_back_document_path && row.id_back_document_path.trim() !== ""),
+      });
       await fetchBlocked(row.id);
     },
     [fetchBlocked, supabase],
@@ -531,6 +601,46 @@ export default function ConsultantAvailabilityPage() {
             </header>
 
             <div className="mt-5 space-y-6">
+              {canManage ? (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="mx-auto w-full max-w-4xl overflow-x-auto">
+                    <div className="mx-auto flex min-w-max items-start justify-center gap-2 px-1">
+                      {progressSteps.map((step, idx) => {
+                        const isNext = !step.done && idx === nextStepIndex;
+                        return (
+                          <div key={step.key} className="flex items-center gap-2">
+                            <div className="flex flex-col items-center gap-1.5">
+                              <span
+                                className={`flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold ${
+                                  step.done
+                                    ? "border-emerald-500/40 bg-emerald-950/40 text-emerald-300"
+                                    : isNext
+                                      ? "border-orange-500/40 bg-orange-950/30 text-orange-200"
+                                      : "border-white/15 bg-black/25 text-white/40"
+                                }`}
+                                aria-hidden
+                              >
+                                {step.done ? "✓" : "○"}
+                              </span>
+                              <span
+                                className={`whitespace-nowrap text-[11px] ${
+                                  step.done ? "text-emerald-300/95" : isNext ? "text-orange-200" : "text-white/55"
+                                }`}
+                              >
+                                {step.label}
+                              </span>
+                            </div>
+                            {idx < progressSteps.length - 1 ? (
+                              <span className="mb-5 block h-px w-8 bg-white/15 sm:w-10" aria-hidden />
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
               {loading ? (
                 <p className="text-sm text-white/50">Loading availability…</p>
               ) : null}

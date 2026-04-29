@@ -1,6 +1,7 @@
 import { AppTopNav } from "@/components/app-top-nav";
 import { MarketplaceWithFilters } from "@/components/marketplace-with-filters";
 import type { MarketplaceResource } from "@/components/marketplace-consultant-grid";
+import { getAnonymizedTalentDisplayName, getCompanyRelationshipMap } from "@/lib/talent-identity";
 import { supabase } from "@/lib/supabase";
 
 const MISSING_TABLE_ERROR_CODE = "42P01";
@@ -17,7 +18,7 @@ export default async function MarketplacePage() {
   const { data, error } = await supabase
     .from("resources")
     .select(
-      "id, name, headline, location, hourly_rate, years_experience, bio, profile_status, created_at, available_from",
+      "id, name, headline, location, hourly_rate, years_experience, bio, profile_status, created_at, available_from, avatar_key",
     )
     .eq("profile_status", "approved")
     .order("created_at", { ascending: false });
@@ -57,21 +58,29 @@ export default async function MarketplacePage() {
 
   const resources: MarketplaceResource[] = baseRows.map((r) => {
     const id = r.id as string;
+    const headline = (r.headline as string | null) ?? null;
     const af = r.available_from as string | null | undefined;
     const upcoming = upcomingBlockedByResource.get(id);
     const nextBlocked = upcoming != null && upcoming.length > 0 ? upcoming[0] : null;
     return {
       id,
       name: (r.name as string) ?? "",
-      headline: (r.headline as string | null) ?? null,
+      anonymized_display_name: getAnonymizedTalentDisplayName(headline, id),
+      can_reveal_identity: false,
+      headline,
       location: (r.location as string | null) ?? null,
       hourly_rate: (r.hourly_rate as number | null) ?? null,
       years_experience: (r.years_experience as number | null) ?? null,
       bio: (r.bio as string | null) ?? null,
+      avatar_key: (r.avatar_key as string | null) ?? null,
       available_from: af != null && String(af).trim() !== "" ? String(af).slice(0, 10) : null,
       next_blocked_date: nextBlocked,
     };
   });
+  const relationshipMap = await getCompanyRelationshipMap(resources.map((resource) => resource.id));
+  for (const resource of resources) {
+    resource.can_reveal_identity = relationshipMap.get(resource.id) === true;
+  }
   const message = error
     ? error.code === MISSING_TABLE_ERROR_CODE
       ? 'The "resources" table does not exist yet.'

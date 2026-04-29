@@ -2,6 +2,7 @@ import { AppTopNav } from "@/components/app-top-nav";
 import { EngagementProposalForm } from "@/components/engagement-proposal-form";
 import { isCompanyProfileComplete } from "@/lib/company-profile";
 import { getCompanyProfileByUserId } from "@/lib/company-profile-server";
+import { getAnonymizedTalentDisplayName, getCompanyRelationshipMap } from "@/lib/talent-identity";
 import { requireCompany } from "@/lib/require-role";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { supabase } from "@/lib/supabase";
@@ -31,7 +32,7 @@ export default async function ProposeEngagementPage({ params }: PageProps) {
 
   const { data, error } = await supabase
     .from("resources")
-    .select("id, name")
+    .select("id, name, headline")
     .eq("id", id)
     .eq("profile_status", "approved")
     .single();
@@ -40,7 +41,13 @@ export default async function ProposeEngagementPage({ params }: PageProps) {
     notFound();
   }
 
-  const consultantName = (data.name as string) ?? "Consultant";
+  const realName = (data.name as string) ?? "Consultant";
+  const headline = (data.headline as string | null) ?? null;
+  const relationshipMap = await getCompanyRelationshipMap([id]);
+  const canRevealIdentity = relationshipMap.get(id) === true;
+  const consultantName = canRevealIdentity
+    ? realName
+    : getAnonymizedTalentDisplayName(headline, id);
 
   return (
     <>

@@ -963,7 +963,8 @@ export default function CompanyDashboardPage() {
   const totalInterviews = interviewRows?.length ?? 0;
   const totalProposals = proposalRows?.length ?? 0;
   const bothEmpty = hasLoaded && totalInterviews === 0 && totalProposals === 0;
-  const welcomeName = profile.company_name.trim() || dashboardEmail || "Company";
+  const welcomeName = profile.company_name.trim() || "Company";
+  const logoFallbackLetter = welcomeName.charAt(0).toUpperCase() || "C";
   const companyProfileComplete = isCompanyProfileComplete(profile);
   const displayedActiveSection: ActiveSection =
     forceCompleteProfile || !companyProfileComplete ? "profile" : activeSection;
@@ -1032,14 +1033,33 @@ export default function CompanyDashboardPage() {
           <header className={`${glassCard} p-6 md:p-8`}>
             <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-300">COMPANY DASHBOARD</p>
-                <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-100 md:text-3xl">
-                  Welcome back, {welcomeName}
-                </h1>
-                <p className="mt-2 max-w-3xl text-sm text-zinc-400">
-                  Manage your company profile, talent needs, and engagement activity.
-                </p>
-                {dashboardEmail ? <p className="mt-3 text-xs text-zinc-500">Signed in as {dashboardEmail}</p> : null}
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/5 md:h-16 md:w-16 md:rounded-2xl">
+                    {logoPreview ? (
+                      <Image
+                        src={logoPreview}
+                        alt={`${welcomeName} logo`}
+                        className="h-full w-full object-cover"
+                        width={64}
+                        height={64}
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-lg font-semibold text-zinc-200 md:text-xl">
+                        {logoFallbackLetter}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-300">COMPANY DASHBOARD</p>
+                    <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-100 md:text-3xl">
+                      Welcome back, {welcomeName}
+                    </h1>
+                    <p className="mt-2 max-w-3xl text-sm text-zinc-400">
+                      Manage your company profile, talent needs, and engagement activity.
+                    </p>
+                    {dashboardEmail ? <p className="mt-3 text-xs text-zinc-500">Signed in as {dashboardEmail}</p> : null}
+                  </div>
+                </div>
               </div>
               <div className="w-full shrink-0 lg:max-w-xs lg:self-stretch">
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">

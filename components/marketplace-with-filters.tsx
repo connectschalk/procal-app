@@ -16,7 +16,7 @@ function matchesSearch(resource: MarketplaceResource, query: string) {
   if (!query) return true;
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  const haystack = [resource.name, resource.headline ?? "", resource.bio ?? ""]
+  const haystack = [resource.anonymized_display_name, resource.headline ?? "", resource.bio ?? ""]
     .join(" ")
     .toLowerCase();
   return haystack.includes(q);
@@ -134,7 +134,7 @@ export function MarketplaceWithFilters({
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Name, headline, or bio"
+              placeholder="Role, title, or bio"
               className={inputClass}
             />
           </label>

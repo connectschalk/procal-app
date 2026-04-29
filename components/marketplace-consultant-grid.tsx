@@ -1,13 +1,17 @@
 import Link from "next/link";
+import { getPublicTalentAvatarDisplay } from "@/lib/talent-avatar-library";
 
 export type MarketplaceResource = {
   id: string;
   name: string;
+  anonymized_display_name: string;
+  can_reveal_identity: boolean;
   headline: string | null;
   location: string | null;
   hourly_rate: number | null;
   years_experience: number | null;
   bio: string | null;
+  avatar_key: string | null;
   /** ISO date YYYY-MM-DD or null when unset */
   available_from: string | null;
   /** Earliest blocked_date >= today for this resource, if any */
@@ -47,42 +51,63 @@ export function MarketplaceConsultantGrid({
     <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
       {resources.map((resource) => (
         <article key={resource.id} className={cardClass}>
-          <div className="space-y-2">
-            <h2 className="text-lg font-semibold tracking-tight text-white">{resource.name}</h2>
-            <div className="space-y-1 text-xs leading-snug">
-              {filterIso !== "" ? (
-                <p>
-                  <span className="text-zinc-500">Availability</span>{" "}
-                  <span className="font-medium" style={{ color: ACCENT }}>
-                    Available on {formatCardDate(filterIso)}
-                  </span>
-                </p>
-              ) : resource.available_from != null && resource.available_from.trim() !== "" ? (
-                <p>
-                  <span className="text-zinc-500">Availability</span>{" "}
-                  <span className="font-medium text-zinc-200">
-                    From {formatCardDate(resource.available_from)}
-                  </span>
-                </p>
-              ) : (
-                <p>
-                  <span className="text-zinc-500">Availability</span>{" "}
-                  <span className="font-medium" style={{ color: ACCENT }}>
-                    Available now
-                  </span>
-                </p>
-              )}
-              {resource.next_blocked_date != null &&
-              resource.next_blocked_date.trim() !== "" &&
-              (filterIso === "" || resource.next_blocked_date > filterIso) ? (
-                <p className="text-zinc-500">
-                  Next unavailable:{" "}
-                  <span className="text-zinc-400">{formatCardDate(resource.next_blocked_date)}</span>
-                </p>
-              ) : null}
-            </div>
-            <p className="text-sm text-zinc-300">{resource.headline ?? "Consultant"}</p>
-          </div>
+          {(() => {
+            const avatar = getPublicTalentAvatarDisplay(resource.avatar_key, resource.headline, resource.bio);
+            const displayName = resource.can_reveal_identity ? resource.name : resource.anonymized_display_name;
+            return (
+              <>
+                <div className="mb-3 flex items-center gap-3">
+                  <div
+                    className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/30"
+                    title={avatar.label}
+                  >
+                    {avatar.imagePath != null ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- static stand-in avatar image
+                      <img src={avatar.imagePath} alt={avatar.label} className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-lg leading-none">{avatar.primary}</span>
+                    )}
+                  </div>
+                  <h2 className="text-lg font-semibold tracking-tight text-white">{displayName}</h2>
+                </div>
+                <div className="space-y-2">
+                  <div className="space-y-1 text-xs leading-snug">
+                    {filterIso !== "" ? (
+                      <p>
+                        <span className="text-zinc-500">Availability</span>{" "}
+                        <span className="font-medium" style={{ color: ACCENT }}>
+                          Available on {formatCardDate(filterIso)}
+                        </span>
+                      </p>
+                    ) : resource.available_from != null && resource.available_from.trim() !== "" ? (
+                      <p>
+                        <span className="text-zinc-500">Availability</span>{" "}
+                        <span className="font-medium text-zinc-200">
+                          From {formatCardDate(resource.available_from)}
+                        </span>
+                      </p>
+                    ) : (
+                      <p>
+                        <span className="text-zinc-500">Availability</span>{" "}
+                        <span className="font-medium" style={{ color: ACCENT }}>
+                          Available now
+                        </span>
+                      </p>
+                    )}
+                    {resource.next_blocked_date != null &&
+                    resource.next_blocked_date.trim() !== "" &&
+                    (filterIso === "" || resource.next_blocked_date > filterIso) ? (
+                      <p className="text-zinc-500">
+                        Next unavailable:{" "}
+                        <span className="text-zinc-400">{formatCardDate(resource.next_blocked_date)}</span>
+                      </p>
+                    ) : null}
+                  </div>
+                  <p className="text-sm text-zinc-300">{resource.headline ?? "Verified Talent"}</p>
+                </div>
+              </>
+            );
+          })()}
 
           <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-white/[0.06] pt-4 text-sm">
             <div>

@@ -37,10 +37,10 @@ type ProgressStep = {
 function AvatarCirclePreview({ option, selected }: { option: TalentAvatarOption; selected: boolean }) {
   return (
     <div
-      className={`flex h-[88px] w-[88px] flex-col items-center justify-center gap-0.5 rounded-full border bg-gradient-to-br from-zinc-600/80 via-zinc-800 to-zinc-950 shadow-inner transition ${
+      className={`flex h-[88px] w-[88px] flex-col items-center justify-center gap-0.5 rounded-full border-2 bg-gradient-to-br from-zinc-600/80 via-zinc-800 to-zinc-950 shadow-inner transition ${
         selected
-          ? "border-orange-500 ring-2 ring-orange-500/40"
-          : "border-white/10 hover:border-white/20"
+          ? "scale-105 border-orange-500 shadow-[0_0_0_3px_rgba(249,115,22,0.2)]"
+          : "border-white/10 hover:border-orange-400/60 hover:shadow-[0_0_0_3px_rgba(255,255,255,0.08)]"
       }`}
       title={option.label}
     >
@@ -111,6 +111,8 @@ export default function ConsultantEditProfilePage() {
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [blockedDatesCount, setBlockedDatesCount] = useState(0);
   const createChecklistRef = useRef<HTMLDivElement | null>(null);
+  const profileSectionRef = useRef<HTMLDivElement | null>(null);
+  const photoSectionRef = useRef<HTMLDivElement | null>(null);
   const docsSectionRef = useRef<HTMLDivElement | null>(null);
   const cvRowRef = useRef<HTMLLIElement | null>(null);
   const idFrontRowRef = useRef<HTMLLIElement | null>(null);
@@ -568,6 +570,20 @@ export default function ConsultantEditProfilePage() {
     setSaveModalOpen(false);
   }
 
+  function focusSection(section: "profile" | "photo" | "documents") {
+    if (section === "profile") {
+      profileSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      profileSectionRef.current?.focus();
+    } else if (section === "photo") {
+      photoSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      photoSectionRef.current?.focus();
+    } else {
+      docsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      docsSectionRef.current?.focus();
+    }
+    setSaveModalOpen(false);
+  }
+
   return (
     <>
       <AppTopNav variant="hero" />
@@ -598,6 +614,9 @@ export default function ConsultantEditProfilePage() {
                     later.
                   </>
                 )}
+              </p>
+              <p className="mt-2 text-sm text-white/55">
+                Complete the steps below to make your profile ready for review.
               </p>
             </div>
             <Link
@@ -672,6 +691,14 @@ export default function ConsultantEditProfilePage() {
             </p>
           ) : null}
 
+          {(canEdit || isCreateMode) && success ? (
+            <p className="mt-6 rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-100">
+              {profileJustCreated
+                ? "Profile created. Continue below to upload your photo, CV, ID documents, and set availability."
+                : "Profile saved. Continue below to complete the remaining onboarding steps."}
+            </p>
+          ) : null}
+
           {ambiguous ? (
             <p className={`${glassCard} mt-6 border-amber-500/30 text-sm text-amber-100`}>
               Multiple profiles match this email. Contact support to update your profile.
@@ -717,68 +744,9 @@ export default function ConsultantEditProfilePage() {
             </div>
           ) : null}
 
-          {canEdit && success ? (
-            <div className={`${glassCard} mt-6 border-emerald-500/25`}>
-              {profileJustCreated ? (
-                <>
-                  <p className="text-sm text-white/80">
-                    <span className="font-semibold text-emerald-100">Talent profile created.</span> You can now
-                    upload your photo, CV and ID documents.
-                  </p>
-                  <div className="mt-6 flex flex-wrap gap-3">
-                    <Link
-                      href="#talent-verification-documents"
-                      className="inline-flex items-center justify-center rounded-2xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:brightness-105"
-                      style={{ backgroundColor: ACCENT }}
-                    >
-                      Upload documents
-                    </Link>
-                    <Link
-                      href="/talent/availability"
-                      className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-black/30 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-black/45"
-                    >
-                      Set availability
-                    </Link>
-                    {resourceId != null ? (
-                      <Link
-                        href={`/consultants/${resourceId}`}
-                        className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-black/30 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-black/45"
-                      >
-                        View public profile
-                      </Link>
-                    ) : null}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p className="text-base font-semibold text-emerald-100">Profile updated</p>
-                  {documentsIncomplete ? (
-                    <p className="mt-3 rounded-xl border border-amber-500/25 bg-amber-950/25 px-3 py-2 text-sm text-amber-100/95">
-                      Your profile can be saved, but verification is incomplete until all documents are uploaded.
-                    </p>
-                  ) : null}
-                  <div className="mt-6 flex flex-wrap gap-3">
-                    <Link
-                      href="/talent"
-                      className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500"
-                    >
-                      Back to dashboard
-                    </Link>
-                    <Link
-                      href="/marketplace"
-                      className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-black/30 px-5 py-2.5 text-sm font-medium text-white hover:bg-black/45"
-                    >
-                      View marketplace
-                    </Link>
-                  </div>
-                </>
-              )}
-            </div>
-          ) : null}
-
-          {(canEdit || isCreateMode) && !success ? (
+          {(canEdit || isCreateMode) ? (
             <div className="mt-8 space-y-6">
-              <div className={glassCard}>
+              <div ref={profileSectionRef} tabIndex={-1} className={glassCard}>
                 <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
                   <div className="flex flex-col items-center gap-4">
                     {/* TODO: Swap emoji preview for static image assets keyed by avatar_key. */}
@@ -793,13 +761,17 @@ export default function ConsultantEditProfilePage() {
                       </button>
                     </div>
 
-                    <div className="w-full max-w-xs rounded-2xl border border-white/10 bg-black/25 p-4 backdrop-blur-sm">
+                    <div
+                      ref={photoSectionRef}
+                      tabIndex={-1}
+                      className="w-full max-w-xs rounded-2xl border border-white/10 bg-black/25 p-4 backdrop-blur-sm outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40"
+                    >
                       <p className="text-xs font-semibold uppercase tracking-wide text-[#ff6a00]">
                         Upload real photo
                       </p>
                       {isCreateMode ? (
                         <p className="mt-2 text-xs leading-relaxed text-amber-100/85">
-                          You can prepare these next. Uploads unlock after your basic profile is created.
+                          Uploads unlock as soon as your profile is created.
                         </p>
                       ) : (
                         <p className="mt-2 text-xs leading-relaxed text-white/55">
@@ -834,7 +806,7 @@ export default function ConsultantEditProfilePage() {
                         {uploadBusy
                           ? "Uploading…"
                           : !canEdit
-                            ? "Available after profile is saved"
+                            ? "Save basic profile first"
                           : profilePhotoPath != null && profilePhotoPath.trim() !== ""
                             ? "Replace photo"
                             : "Choose file"}
@@ -892,7 +864,7 @@ export default function ConsultantEditProfilePage() {
                       </p>
                       <p className="mt-2 text-xs leading-relaxed text-white/55">
                         {isCreateMode
-                          ? "You can prepare these next. Uploads unlock after your basic profile is created."
+                          ? "Uploads unlock as soon as your profile is created."
                           : "Upload your CV and ID documents privately. These are used for verification and are not shown on your public profile."}
                       </p>
                       <ul className="mt-4 space-y-4">
@@ -964,7 +936,7 @@ export default function ConsultantEditProfilePage() {
                               {docUploading === row.type
                                 ? "Uploading…"
                                 : !canEdit
-                                  ? "Available after profile is saved"
+                                  ? "Save basic profile first"
                                 : row.path != null && row.path.trim() !== ""
                                   ? row.type === "cv"
                                     ? "Replace CV"
@@ -1114,19 +1086,22 @@ export default function ConsultantEditProfilePage() {
               Choose public avatar
             </h2>
             <p className="mt-1 text-xs text-white/55">
-              {/* TODO: Swap grid for image thumbnails when static assets exist. */}
-              Pick a fun placeholder. This is what visitors see until real-photo unlock ships.
+              Pick a placeholder avatar. This is what companies see before engaging with you.
             </p>
+            <div className="mt-4 max-w-lg rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-gray-300">
+              Avatar is used until a company requests an interview or booking, after which your real profile details
+              become visible.
+            </div>
+            <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-white/60">Default avatar</p>
             <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4">
               {TALENT_AVATAR_OPTIONS.map((opt) => (
                 <button
                   key={opt.key}
                   type="button"
                   onClick={() => pickAvatar(opt.key)}
-                  className="flex flex-col items-center gap-2 rounded-2xl border border-transparent p-2 text-center transition hover:border-white/15 hover:bg-white/5"
+                  className="flex flex-col items-center rounded-2xl border border-transparent p-2 text-center transition hover:border-white/15 hover:bg-white/5"
                 >
                   <AvatarCirclePreview option={opt} selected={avatarKey === opt.key} />
-                  <span className="text-[10px] font-medium leading-tight text-white/65">{opt.label}</span>
                 </button>
               ))}
             </div>
@@ -1152,12 +1127,23 @@ export default function ConsultantEditProfilePage() {
             onClick={() => setSaveModalOpen(false)}
           />
           <div className="relative z-[111] w-full max-w-lg rounded-3xl border border-white/10 bg-[#0b0f1a]/95 p-5 shadow-2xl backdrop-blur-xl sm:p-6">
-            <h2 className="text-xl font-semibold text-white">Profile saved</h2>
+            <h2 className="text-xl font-semibold text-white">
+              {profileJustCreated ? "Profile created" : "Profile saved"}
+            </h2>
             <p className="mt-2 text-sm text-white/70">
-              Your basic Talent profile is saved. Complete the next steps to prepare your profile for verification.
+              {profileJustCreated
+                ? "Your basic Talent profile is saved. You can now upload your photo, CV and ID documents."
+                : "Your profile changes are saved. Continue with any remaining onboarding steps."}
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
-              {!checklist.cvComplete ? (
+              <button
+                type="button"
+                onClick={() => focusSection("photo")}
+                className="rounded-xl border border-orange-500/35 bg-orange-950/35 px-3 py-2 text-sm font-semibold text-orange-100 transition hover:brightness-110"
+              >
+                Upload photo
+              </button>
+              {!checklist.cvComplete || profileJustCreated ? (
                 <button
                   type="button"
                   onClick={() => focusUploadArea("cv")}
@@ -1166,33 +1152,22 @@ export default function ConsultantEditProfilePage() {
                   Upload CV
                 </button>
               ) : null}
-              {!checklist.idFrontComplete ? (
+              {!checklist.idFrontComplete || !checklist.idBackComplete || profileJustCreated ? (
                 <button
                   type="button"
-                  onClick={() => focusUploadArea("id_front")}
+                  onClick={() => focusSection("documents")}
                   className="rounded-xl border border-orange-500/35 bg-orange-950/35 px-3 py-2 text-sm font-semibold text-orange-100 transition hover:brightness-110"
                 >
-                  Upload ID front
+                  Upload ID
                 </button>
               ) : null}
-              {!checklist.idBackComplete ? (
-                <button
-                  type="button"
-                  onClick={() => focusUploadArea("id_back")}
-                  className="rounded-xl border border-orange-500/35 bg-orange-950/35 px-3 py-2 text-sm font-semibold text-orange-100 transition hover:brightness-110"
-                >
-                  Upload ID back
-                </button>
-              ) : null}
-              {!checklist.availabilityComplete ? (
-                <Link
-                  href="/talent/availability"
-                  onClick={() => setSaveModalOpen(false)}
-                  className="rounded-xl border border-orange-500/35 bg-orange-950/35 px-3 py-2 text-sm font-semibold text-orange-100 transition hover:brightness-110"
-                >
-                  Set availability
-                </Link>
-              ) : null}
+              <Link
+                href="/talent/availability"
+                onClick={() => setSaveModalOpen(false)}
+                className="rounded-xl border border-orange-500/35 bg-orange-950/35 px-3 py-2 text-sm font-semibold text-orange-100 transition hover:brightness-110"
+              >
+                Set availability
+              </Link>
             </div>
             <div className="mt-6 flex flex-col gap-2 sm:flex-row">
               <button
@@ -1208,9 +1183,20 @@ export default function ConsultantEditProfilePage() {
                 className="inline-flex flex-1 items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-105"
                 style={{ backgroundColor: ACCENT }}
               >
-                View Talent Dashboard
+                Talent Dashboard
               </Link>
             </div>
+            {resourceId != null ? (
+              <div className="mt-2">
+                <Link
+                  href={`/consultants/${resourceId}`}
+                  onClick={() => setSaveModalOpen(false)}
+                  className="text-xs font-medium text-white/60 transition hover:text-white"
+                >
+                  View profile
+                </Link>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

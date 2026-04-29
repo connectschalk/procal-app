@@ -2,6 +2,7 @@ import { AppTopNav } from "@/components/app-top-nav";
 import { InterviewRequestForm } from "@/components/interview-request-form";
 import { isCompanyProfileComplete } from "@/lib/company-profile";
 import { getCompanyProfileByUserId } from "@/lib/company-profile-server";
+import { getAnonymizedTalentDisplayName, getCompanyRelationshipMap } from "@/lib/talent-identity";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { getPublicTalentAvatarDisplay } from "@/lib/talent-avatar-library";
 import { requireCompany } from "@/lib/require-role";
@@ -62,8 +63,13 @@ export default async function RequestInterviewPage({ params }: PageProps) {
     notFound();
   }
 
-  const consultantName = (data.name as string) ?? "Talent";
+  const realName = (data.name as string) ?? "Talent";
   const headline = (data.headline as string | null) ?? null;
+  const relationshipMap = await getCompanyRelationshipMap([id]);
+  const canRevealIdentity = relationshipMap.get(id) === true;
+  const consultantName = canRevealIdentity
+    ? realName
+    : getAnonymizedTalentDisplayName(headline, id);
   const location = (data.location as string | null) ?? null;
   const hourlyRate = data.hourly_rate as number | null;
   const bioRaw = (data.bio as string | null) ?? null;

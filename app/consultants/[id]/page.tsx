@@ -2,6 +2,7 @@ import { AppTopNav } from "@/components/app-top-nav";
 import { PublicAvailabilityCalendar } from "@/components/public-availability-calendar";
 import { isCompanyProfileComplete } from "@/lib/company-profile";
 import { getCompanyProfileByUserId, getUserRoleById } from "@/lib/company-profile-server";
+import { getAnonymizedTalentDisplayName, getCompanyRelationshipMap } from "@/lib/talent-identity";
 import { getPublicTalentAvatarDisplay } from "@/lib/talent-avatar-library";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { supabase } from "@/lib/supabase";
@@ -158,6 +159,10 @@ export default async function ConsultantProfilePage({ params }: PageProps) {
 
   const name = data.name as string;
   const headline = (data.headline as string | null) ?? null;
+  const relationshipMap = await getCompanyRelationshipMap([id]);
+  const canRevealIdentity = relationshipMap.get(id) === true;
+  const displayName = canRevealIdentity ? name : getAnonymizedTalentDisplayName(headline, id);
+  const publicTitle = headline?.trim() ? headline : "Verified Talent";
   const location = (data.location as string | null) ?? null;
   const hourly_rate = data.hourly_rate as number | null;
   const years_experience = data.years_experience as number | null;
@@ -228,8 +233,8 @@ export default async function ConsultantProfilePage({ params }: PageProps) {
 
               <div className="min-w-0 flex-1 text-center md:text-left">
                 <p className={accentEyebrow}>Talent profile</p>
-                <h1 className="mt-2 text-3xl font-bold tracking-tight text-white md:text-4xl">{name}</h1>
-                <p className="mt-2 text-lg text-white/70 md:text-xl">{headline ?? "Talent"}</p>
+                <h1 className="mt-2 text-3xl font-bold tracking-tight text-white md:text-4xl">{displayName}</h1>
+                <p className="mt-2 text-lg text-white/70 md:text-xl">{publicTitle}</p>
 
                 <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className={statShell}>

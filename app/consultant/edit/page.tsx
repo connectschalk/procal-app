@@ -6,6 +6,12 @@ import {
   TALENT_AVATAR_OPTIONS,
   type TalentAvatarOption,
 } from "@/lib/talent-avatar-library";
+import {
+  CORE_TALENT_INDUSTRIES,
+  OTHER_TALENT_OPTION,
+  getTalentRolesForIndustry,
+  isCoreTalentIndustry,
+} from "@/lib/talent-taxonomy";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import Link from "next/link";
 import {
@@ -95,6 +101,9 @@ export default function ConsultantEditProfilePage() {
   const [bio, setBio] = useState("");
   const [hourlyRate, setHourlyRate] = useState("");
   const [location, setLocation] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [resourceType, setResourceType] = useState("");
+  const [otherResourceType, setOtherResourceType] = useState("");
   const [avatarKey, setAvatarKey] = useState<string | null>(null);
   const [profilePhotoPath, setProfilePhotoPath] = useState<string | null>(null);
   const [photoSignedUrl, setPhotoSignedUrl] = useState<string | null>(null);
@@ -136,9 +145,14 @@ export default function ConsultantEditProfilePage() {
       if (!Number.isFinite(n) || n < 0) missing.push("Hourly rate (must be a valid non-negative number)");
     }
     if (location.trim() === "") missing.push("Location");
+    if (industry.trim() === "") missing.push("Industry");
+    if (resourceType.trim() === "") missing.push("Resource type");
+    if (industry === OTHER_TALENT_OPTION || resourceType === OTHER_TALENT_OPTION) {
+      if (otherResourceType.trim() === "") missing.push("Describe your role");
+    }
     if (avatarKey == null || avatarKey.trim() === "") missing.push("Avatar");
     return missing;
-  }, [isCreateMode, name, headline, bio, hourlyRate, location, avatarKey]);
+  }, [isCreateMode, name, headline, bio, hourlyRate, location, industry, resourceType, otherResourceType, avatarKey]);
 
   const { documentsIncomplete, checklist } = useMemo(() => {
     const profileDetailsComplete =
@@ -146,7 +160,10 @@ export default function ConsultantEditProfilePage() {
       headline.trim().length > 0 &&
       bio.trim().length > 0 &&
       hourlyRate.trim().length > 0 &&
-      location.trim().length > 0;
+      location.trim().length > 0 &&
+      industry.trim().length > 0 &&
+      resourceType.trim().length > 0 &&
+      (!(industry === OTHER_TALENT_OPTION || resourceType === OTHER_TALENT_OPTION) || otherResourceType.trim().length > 0);
     const publicAvatarComplete = Boolean(avatarKey && avatarKey.trim().length > 0);
     const photoComplete = Boolean(profilePhotoPath && profilePhotoPath.trim().length > 0);
     const cvComplete = Boolean(cvPath && cvPath.trim().length > 0);
@@ -173,7 +190,7 @@ export default function ConsultantEditProfilePage() {
         availabilityComplete,
       },
     };
-  }, [name, headline, bio, hourlyRate, location, avatarKey, profilePhotoPath, cvPath, idFrontPath, idBackPath, availableFrom, blockedDatesCount]);
+  }, [name, headline, bio, hourlyRate, location, industry, resourceType, otherResourceType, avatarKey, profilePhotoPath, cvPath, idFrontPath, idBackPath, availableFrom, blockedDatesCount]);
 
   const progressSteps = useMemo<ProgressStep[]>(
     () => [
@@ -207,7 +224,7 @@ export default function ConsultantEditProfilePage() {
     const { data, error: fetchError } = await supabase
       .from("resources")
       .select(
-        "id, name, headline, bio, hourly_rate, location, claimed, avatar_key, profile_photo_path, available_from, cv_document_path, id_front_document_path, id_back_document_path",
+        "id, name, headline, bio, hourly_rate, location, industry, resource_type, other_resource_type, claimed, avatar_key, profile_photo_path, available_from, cv_document_path, id_front_document_path, id_back_document_path",
       )
       .ilike("contact_email", trimmed);
 
@@ -242,6 +259,9 @@ export default function ConsultantEditProfilePage() {
       bio: string | null;
       hourly_rate: number | null;
       location: string | null;
+      industry: string | null;
+      resource_type: string | null;
+      other_resource_type: string | null;
       claimed: boolean | null;
       avatar_key: string | null;
       profile_photo_path: string | null;
@@ -264,6 +284,9 @@ export default function ConsultantEditProfilePage() {
     setHeadline((row.headline as string | null) ?? "");
     setBio((row.bio as string | null) ?? "");
     setLocation((row.location as string | null) ?? "");
+    setIndustry((row.industry as string | null) ?? "");
+    setResourceType((row.resource_type as string | null) ?? "");
+    setOtherResourceType((row.other_resource_type as string | null) ?? "");
     const rate = row.hourly_rate;
     setHourlyRate(rate != null && Number.isFinite(Number(rate)) ? String(rate) : "");
     setAvatarKey(row.avatar_key ?? null);
@@ -307,6 +330,12 @@ export default function ConsultantEditProfilePage() {
     dashboardEmail.trim() !== "" &&
     profilePhotoPath != null &&
     profilePhotoPath.trim() !== "";
+  const selectedIndustry = isCoreTalentIndustry(industry) ? industry : null;
+  const resourceTypeOptions = useMemo(() => {
+    if (industry === OTHER_TALENT_OPTION) return [OTHER_TALENT_OPTION];
+    if (selectedIndustry == null) return [];
+    return [...getTalentRolesForIndustry(selectedIndustry), OTHER_TALENT_OPTION];
+  }, [industry, selectedIndustry]);
 
   useEffect(() => {
     if (!photoFetchEligible) {
@@ -354,6 +383,9 @@ export default function ConsultantEditProfilePage() {
       bio: bio.trim() || null,
       hourly_rate,
       location: location.trim() || null,
+      industry: industry.trim() || null,
+      resource_type: resourceType.trim() || null,
+      other_resource_type: otherResourceType.trim() || null,
       avatar_key: avatarKey,
     };
     if (overrides?.profile_photo_path === null) {
@@ -391,6 +423,21 @@ export default function ConsultantEditProfilePage() {
     setSubmitting(true);
 
     const creating = noProfile && !ambiguous;
+    if (industry.trim() === "") {
+      setError("Please select your industry.");
+      setSubmitting(false);
+      return;
+    }
+    if (resourceType.trim() === "") {
+      setError("Please select your resource type.");
+      setSubmitting(false);
+      return;
+    }
+    if ((industry === OTHER_TALENT_OPTION || resourceType === OTHER_TALENT_OPTION) && otherResourceType.trim() === "") {
+      setError("Describe your role when selecting Other.");
+      setSubmitting(false);
+      return;
+    }
 
     if (creating) {
       if (createModeMissingItems.length > 0) {
@@ -421,6 +468,9 @@ export default function ConsultantEditProfilePage() {
           bio: bio.trim(),
           hourly_rate,
           location: location.trim(),
+          industry: industry.trim(),
+          resource_type: resourceType.trim(),
+          other_resource_type: otherResourceType.trim() || null,
           avatar_key: avatarKey,
         }),
       });
@@ -1004,6 +1054,83 @@ export default function ConsultantEditProfilePage() {
                         className={inputClass}
                       />
                     </label>
+
+                    <section className="space-y-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <h3 className="text-sm font-semibold text-white">Professional category</h3>
+                      <label className="flex flex-col gap-2 text-sm">
+                        <span className="font-medium text-zinc-400">Industry</span>
+                        <select
+                          required
+                          value={industry}
+                          onChange={(e) => {
+                            const nextIndustry = e.target.value;
+                            setIndustry(nextIndustry);
+                            if (nextIndustry === OTHER_TALENT_OPTION) {
+                              setResourceType(OTHER_TALENT_OPTION);
+                            } else if (!isCoreTalentIndustry(nextIndustry)) {
+                              setResourceType("");
+                            } else {
+                              const validOptions = [...getTalentRolesForIndustry(nextIndustry), OTHER_TALENT_OPTION];
+                              if (!validOptions.includes(resourceType)) {
+                                setResourceType("");
+                              }
+                            }
+                            if (nextIndustry !== OTHER_TALENT_OPTION && resourceType !== OTHER_TALENT_OPTION) {
+                              setOtherResourceType("");
+                            }
+                            setError(null);
+                          }}
+                          className={inputClass}
+                        >
+                          <option value="">Select your industry</option>
+                          {CORE_TALENT_INDUSTRIES.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                          <option value={OTHER_TALENT_OPTION}>{OTHER_TALENT_OPTION}</option>
+                        </select>
+                      </label>
+                      <label className="flex flex-col gap-2 text-sm">
+                        <span className="font-medium text-zinc-400">Resource type</span>
+                        <select
+                          required
+                          disabled={industry.trim() === ""}
+                          value={resourceType}
+                          onChange={(e) => {
+                            const nextType = e.target.value;
+                            setResourceType(nextType);
+                            if (nextType !== OTHER_TALENT_OPTION && industry !== OTHER_TALENT_OPTION) {
+                              setOtherResourceType("");
+                            }
+                            setError(null);
+                          }}
+                          className={inputClass}
+                        >
+                          <option value="">{industry.trim() === "" ? "Select industry first" : "Select resource type"}</option>
+                          {resourceTypeOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {industry === OTHER_TALENT_OPTION || resourceType === OTHER_TALENT_OPTION ? (
+                        <label className="flex flex-col gap-2 text-sm">
+                          <span className="font-medium text-zinc-400">Describe your role</span>
+                          <input
+                            required
+                            type="text"
+                            value={otherResourceType}
+                            onChange={(e) => {
+                              setOtherResourceType(e.target.value);
+                              setError(null);
+                            }}
+                            className={inputClass}
+                          />
+                        </label>
+                      ) : null}
+                    </section>
 
                     <label className="flex flex-col gap-2 text-sm">
                       <span className="font-medium text-zinc-400">Bio</span>

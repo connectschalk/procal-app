@@ -336,7 +336,7 @@ export default function ConsultantAvailabilityPage() {
       const { data, error: fetchError } = await supabase
         .from("resources")
         .select(
-          "id, name, claimed, available_from, headline, bio, hourly_rate, location, avatar_key, profile_photo_path, cv_document_path, id_front_document_path, id_back_document_path",
+          "id, name, claimed, available_from, headline, bio, hourly_rate, location, industry, resource_type, other_resource_type, avatar_key, profile_photo_path, cv_document_path, id_front_document_path, id_back_document_path",
         )
         .ilike("contact_email", trimmed);
 
@@ -369,6 +369,9 @@ export default function ConsultantAvailabilityPage() {
         bio: string | null;
         hourly_rate: number | null;
         location: string | null;
+        industry: string | null;
+        resource_type: string | null;
+        other_resource_type: string | null;
         avatar_key: string | null;
         profile_photo_path: string | null;
         cv_document_path: string | null;
@@ -395,7 +398,11 @@ export default function ConsultantAvailabilityPage() {
           Boolean(row.headline && row.headline.trim() !== "") &&
           Boolean(row.bio && row.bio.trim() !== "") &&
           row.hourly_rate != null &&
-          Boolean(row.location && row.location.trim() !== ""),
+          Boolean(row.location && row.location.trim() !== "") &&
+          Boolean(row.industry && row.industry.trim() !== "") &&
+          Boolean(row.resource_type && row.resource_type.trim() !== "") &&
+          (!(row.industry === "Other" || row.resource_type === "Other") ||
+            Boolean(row.other_resource_type && row.other_resource_type.trim() !== "")),
         avatar: Boolean(row.avatar_key && row.avatar_key.trim() !== ""),
         photo: Boolean(row.profile_photo_path && row.profile_photo_path.trim() !== ""),
         cv: Boolean(row.cv_document_path && row.cv_document_path.trim() !== ""),

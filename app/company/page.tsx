@@ -8,6 +8,15 @@ import { isCompanyProfileComplete } from "@/lib/company-profile";
 import { getPublicTalentAvatarDisplay } from "@/lib/talent-avatar-library";
 import { WelcomeToProcalModal } from "@/components/welcome-to-procal-modal";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import {
+  COMPANY_TALENT_INDUSTRIES,
+  DEFAULT_COMPANY_TALENT_INDUSTRY,
+  DEFAULT_TALENT_RESOURCE_TYPE,
+  TALENT_RESOURCE_GROUPS_BY_INDUSTRY,
+  getTalentRolesForIndustry,
+  isCoreTalentIndustry,
+  type CoreTalentIndustry,
+} from "@/lib/talent-taxonomy";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -78,6 +87,8 @@ type CompanyProfile = {
   location: string;
   description: string;
   talent_interests: string[];
+  talent_industry: string;
+  talent_resource_type: string;
 };
 
 type CompanyProfileInlineErrors = Partial<
@@ -97,6 +108,8 @@ function mapApiProfileToState(p: Partial<CompanyProfile> | null | undefined): Co
     talent_interests: Array.isArray(p?.talent_interests)
       ? p.talent_interests.filter((v): v is string => typeof v === "string")
       : [],
+    talent_industry: typeof p?.talent_industry === "string" ? p.talent_industry : "",
+    talent_resource_type: typeof p?.talent_resource_type === "string" ? p.talent_resource_type : "",
   };
 }
 
@@ -123,22 +136,26 @@ type RequirementForm = {
   location: string;
 };
 
-const INTEREST_OPTIONS = [
-  "Business Analyst",
-  "Solution Architect",
-  "Enterprise Architect",
-  "Programme Manager",
-  "Project Manager",
-  "Change Manager",
-  "Scrum Master",
-  "Product Owner",
-  "Data Analyst",
-  "SAP Consultant",
-  "Integration Specialist",
-  "Developer",
-  "QA / Tester",
-  "Business Process Analyst",
-] as const;
+function normalizeTalentSelectionFromProfile(p: Partial<CompanyProfile> | null | undefined): {
+  selectedIndustry: CoreTalentIndustry;
+  selectedResourceType: string;
+} {
+  const state = mapApiProfileToState(p);
+  const legacyIndustry = isCoreTalentIndustry(state.talent_interests[0]) ? state.talent_interests[0] : null;
+  const selectedIndustry =
+    (isCoreTalentIndustry(state.talent_industry) ? state.talent_industry : null) ??
+    legacyIndustry ??
+    DEFAULT_COMPANY_TALENT_INDUSTRY;
+  const validRoles = getTalentRolesForIndustry(selectedIndustry);
+  const legacyResourceType = typeof state.talent_interests[1] === "string" ? state.talent_interests[1] : null;
+  const selectedResourceTypeRaw =
+    state.talent_resource_type.trim() !== "" ? state.talent_resource_type : (legacyResourceType ?? DEFAULT_TALENT_RESOURCE_TYPE);
+  const selectedResourceType =
+    selectedResourceTypeRaw === DEFAULT_TALENT_RESOURCE_TYPE || validRoles.includes(selectedResourceTypeRaw)
+      ? selectedResourceTypeRaw
+      : DEFAULT_TALENT_RESOURCE_TYPE;
+  return { selectedIndustry, selectedResourceType };
+}
 
 function formatSlot(value: string | null) {
   if (!value) return "—";
@@ -299,7 +316,11 @@ export default function CompanyDashboardPage() {
     location: "",
     description: "",
     talent_interests: [],
+    talent_industry: DEFAULT_COMPANY_TALENT_INDUSTRY,
+    talent_resource_type: DEFAULT_TALENT_RESOURCE_TYPE,
   });
+  const [selectedIndustry, setSelectedIndustry] = useState<CoreTalentIndustry>(DEFAULT_COMPANY_TALENT_INDUSTRY);
+  const [selectedResourceType, setSelectedResourceType] = useState<string>(DEFAULT_TALENT_RESOURCE_TYPE);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
   const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null);
@@ -387,8 +408,11 @@ export default function CompanyDashboardPage() {
     setProfileError(null);
     clearPendingLogo();
     const p = json.profile ?? null;
+    const normalizedSelection = normalizeTalentSelectionFromProfile(p);
     setHasCompanyProfile(p != null);
     setProfile(mapApiProfileToState(p ?? undefined));
+    setSelectedIndustry(normalizedSelection.selectedIndustry);
+    setSelectedResourceType(normalizedSelection.selectedResourceType);
     if (!(typeof p?.logo_path === "string" && p.logo_path.trim() !== "")) {
       setLogoPreview(null);
     }
@@ -721,18 +745,6 @@ export default function CompanyDashboardPage() {
     };
   }, [supabase, loadDashboard, loadCompanyProfile, loadRequirements]);
 
-  const toggleInterest = useCallback((interest: string) => {
-    setProfile((prev) => {
-      const has = prev.talent_interests.includes(interest);
-      return {
-        ...prev,
-        talent_interests: has
-          ? prev.talent_interests.filter((v) => v !== interest)
-          : [...prev.talent_interests, interest],
-      };
-    });
-  }, []);
-
   const onLogoFileChosen = useCallback((file: File) => {
     setProfileError(null);
     setProfileSuccess(null);
@@ -769,20 +781,35 @@ export default function CompanyDashboardPage() {
     const res = await fetch("/api/update-company-profile", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(profile),
+      body: JSON.stringify({
+        ...profile,
+        talent_interests: [selectedIndustry, selectedResourceType],
+        talent_industry: selectedIndustry,
+        talent_resource_type: selectedResourceType,
+      }),
     });
     const json = (await res.json().catch(() => ({}))) as {
       success?: boolean;
       error?: string;
       profile?: Partial<CompanyProfile> | null;
+      details?: unknown;
     };
     if (!res.ok || json.success !== true) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("[company-profile] save failed", {
+          status: res.status,
+          body: json,
+        });
+      }
       setProfileSaving(false);
       setProfileError(json.error ?? "Could not save company profile");
       return;
     }
     if (json.profile != null) {
+      const normalizedSelection = normalizeTalentSelectionFromProfile(json.profile);
       setProfile(mapApiProfileToState(json.profile));
+      setSelectedIndustry(normalizedSelection.selectedIndustry);
+      setSelectedResourceType(normalizedSelection.selectedResourceType);
     }
     setHasCompanyProfile(true);
 
@@ -801,8 +828,15 @@ export default function CompanyDashboardPage() {
       };
       setLogoUploading(false);
       if (!upRes.ok || upJson.success !== true || !upJson.path) {
+        if (process.env.NODE_ENV === "development") {
+          console.error("[company-profile] logo upload failed", {
+            status: upRes.status,
+            body: upJson,
+          });
+        }
         setProfileSaving(false);
-        setProfileError(upJson.error ?? "Could not upload logo");
+        setProfileSuccess("Company profile saved.");
+        setProfileError(`Profile saved, but logo upload failed: ${upJson.error ?? "Could not upload logo"}`);
         return;
       }
       logoUploaded = true;
@@ -815,7 +849,7 @@ export default function CompanyDashboardPage() {
     const lines = ["Company profile saved."];
     if (logoUploaded) lines.push("Logo uploaded.");
     setProfileSuccess(lines.join("\n"));
-  }, [profile, pendingLogoFile, clearPendingLogo]);
+  }, [profile, pendingLogoFile, clearPendingLogo, selectedIndustry, selectedResourceType]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1025,6 +1059,11 @@ export default function CompanyDashboardPage() {
   const companyProfileComplete = isCompanyProfileComplete(profile);
   const displayedActiveSection: ActiveSection =
     forceCompleteProfile || !companyProfileComplete ? "profile" : activeSection;
+  const resourceGroupsForIndustry = TALENT_RESOURCE_GROUPS_BY_INDUSTRY[selectedIndustry];
+  const onIndustrySelect = useCallback((industry: CoreTalentIndustry) => {
+    setSelectedIndustry(industry);
+    setSelectedResourceType(DEFAULT_TALENT_RESOURCE_TYPE);
+  }, []);
   const modalAvailableFromIso =
     availabilityModalRow?.available_from != null && availabilityModalRow.available_from.trim() !== ""
       ? availabilityModalRow.available_from.trim()
@@ -1409,37 +1448,85 @@ export default function CompanyDashboardPage() {
 
           {displayedActiveSection === "interests" ? (
             <section className={`${glassCard} p-6 transition-opacity duration-200 md:p-8`}>
-            <h2 className="text-lg font-semibold text-zinc-100">Talent interests</h2>
-            <p className="mt-1 text-sm text-zinc-400">IT Consulting</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {INTEREST_OPTIONS.map((interest) => {
-                const selected = profile.talent_interests.includes(interest);
-                return (
-                  <button
-                    key={interest}
-                    type="button"
-                    onClick={() => toggleInterest(interest)}
-                    className={
-                      selected
-                        ? "rounded-full border border-orange-500 bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white"
-                        : "rounded-full border border-zinc-700 bg-zinc-900/70 px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:border-zinc-500"
-                    }
-                  >
-                    {interest}
+              <h2 className="text-lg font-semibold text-zinc-100">Talent interests</h2>
+              <p className="mt-1 text-sm text-zinc-400">
+                Select the industry and type of talent you are most interested in.
+              </p>
+
+              <div className="mt-6 space-y-3">
+                <p className="text-xs font-medium uppercase tracking-widest text-zinc-400">Industry</p>
+                <div className="grid gap-3 md:grid-cols-3">
+                  {COMPANY_TALENT_INDUSTRIES.map((industry) => {
+                    const selected = selectedIndustry === industry;
+                    return (
+                      <label
+                        key={industry}
+                        className={`cursor-pointer rounded-xl border p-3 text-sm transition ${
+                          selected
+                            ? "border-orange-500 bg-orange-500/10 text-zinc-100"
+                            : "border-white/10 bg-white/5 text-zinc-300 hover:border-orange-400/50"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="talent-industry"
+                          value={industry}
+                          checked={selected}
+                          onChange={() => onIndustrySelect(industry)}
+                          className="sr-only"
+                        />
+                        {industry}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-7 space-y-4">
+                <p className="text-xs font-medium uppercase tracking-widest text-zinc-400">Resource type</p>
+                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 transition hover:border-orange-400/40">
+                  <input
+                    type="radio"
+                    name="talent-resource-type"
+                    value={DEFAULT_TALENT_RESOURCE_TYPE}
+                    checked={selectedResourceType === DEFAULT_TALENT_RESOURCE_TYPE}
+                    onChange={() => setSelectedResourceType(DEFAULT_TALENT_RESOURCE_TYPE)}
+                    className="h-4 w-4 border-zinc-500 bg-zinc-900 text-orange-500 focus:ring-orange-500/40"
+                  />
+                  <span>All roles</span>
+                </label>
+                {resourceGroupsForIndustry.map((group) => (
+                  <div key={group.heading} className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-orange-400">{group.heading}</p>
+                    <div className="space-y-2">
+                      {group.roles.map((role) => (
+                        <label
+                          key={role}
+                          className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 transition hover:border-orange-400/40"
+                        >
+                          <input
+                            type="radio"
+                            name="talent-resource-type"
+                            value={role}
+                            checked={selectedResourceType === role}
+                            onChange={() => setSelectedResourceType(role)}
+                            className="h-4 w-4 border-zinc-500 bg-zinc-900 text-orange-500 focus:ring-orange-500/40"
+                          />
+                          <span>{role}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 border-t border-white/10 pt-6">
+                <div className="flex justify-end">
+                  <button type="button" disabled={profileSaving} onClick={saveProfile} className={primaryButtonClass}>
+                    {profileSaving ? "Saving..." : "Save interests"}
                   </button>
-                );
-              })}
-            </div>
-            <div className="mt-6 border-t border-white/10 pt-6">
-              <button
-                type="button"
-                disabled={profileSaving}
-                onClick={saveProfile}
-                className={`${primaryButtonClass} md:ml-auto`}
-              >
-                {profileSaving ? "Saving..." : "Save interests"}
-              </button>
-            </div>
+                </div>
+              </div>
             </section>
           ) : null}
 

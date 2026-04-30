@@ -1,4 +1,5 @@
 import { isValidTalentAvatarKey } from "@/lib/talent-avatar-library";
+import { OTHER_TALENT_OPTION, isCoreTalentIndustry } from "@/lib/talent-taxonomy";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { createServiceRoleSupabase } from "@/lib/supabase-service-role";
 import { NextResponse } from "next/server";
@@ -9,6 +10,9 @@ type Body = {
   bio?: unknown;
   hourly_rate?: unknown;
   location?: unknown;
+  industry?: unknown;
+  resource_type?: unknown;
+  other_resource_type?: unknown;
   avatar_key?: unknown;
 };
 
@@ -97,6 +101,21 @@ export async function POST(request: Request) {
   if (avatar_key == null) {
     return NextResponse.json({ success: false, error: "avatar_key is required" }, { status: 400 });
   }
+  const industry = typeof json.industry === "string" ? json.industry.trim() : "";
+  if (industry === "") {
+    return NextResponse.json({ success: false, error: "industry is required" }, { status: 400 });
+  }
+  const resource_type = typeof json.resource_type === "string" ? json.resource_type.trim() : "";
+  if (resource_type === "") {
+    return NextResponse.json({ success: false, error: "resource_type is required" }, { status: 400 });
+  }
+  if (!(isCoreTalentIndustry(industry) || industry === OTHER_TALENT_OPTION)) {
+    return NextResponse.json({ success: false, error: "Invalid industry" }, { status: 400 });
+  }
+  const other_resource_type = typeof json.other_resource_type === "string" ? json.other_resource_type.trim() : "";
+  if ((industry === OTHER_TALENT_OPTION || resource_type === OTHER_TALENT_OPTION) && other_resource_type === "") {
+    return NextResponse.json({ success: false, error: "other_resource_type is required when using Other" }, { status: 400 });
+  }
 
   const admin = createServiceRoleSupabase();
   if (!admin) {
@@ -131,6 +150,9 @@ export async function POST(request: Request) {
     bio,
     hourly_rate,
     location,
+    industry,
+    resource_type,
+    other_resource_type: other_resource_type === "" ? null : other_resource_type,
     avatar_key,
     claimed: true,
     profile_status: "approved",

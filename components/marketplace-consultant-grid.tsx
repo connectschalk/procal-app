@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getPublicTalentAvatarDisplay } from "@/lib/talent-avatar-library";
+import { getResourceTypeLabel } from "@/lib/resource-display";
 
 export type MarketplaceResource = {
   id: string;
@@ -12,6 +13,9 @@ export type MarketplaceResource = {
   years_experience: number | null;
   bio: string | null;
   avatar_key: string | null;
+  industry: string | null;
+  resource_type: string | null;
+  other_resource_type: string | null;
   /** ISO date YYYY-MM-DD or null when unset */
   available_from: string | null;
   /** Earliest blocked_date >= today for this resource, if any */
@@ -54,6 +58,7 @@ export function MarketplaceConsultantGrid({
           {(() => {
             const avatar = getPublicTalentAvatarDisplay(resource.avatar_key, resource.headline, resource.bio);
             const displayName = resource.can_reveal_identity ? resource.name : resource.anonymized_display_name;
+            const resourceTypeLabel = getResourceTypeLabel(resource);
             return (
               <>
                 <div className="mb-3 flex items-center gap-3">
@@ -103,7 +108,15 @@ export function MarketplaceConsultantGrid({
                       </p>
                     ) : null}
                   </div>
-                  <p className="text-sm text-zinc-300">{resource.headline ?? "Verified Talent"}</p>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-orange-400">
+                      {resource.industry?.trim() || "Industry not listed"}
+                    </p>
+                    <p className="text-sm font-medium text-white">{resourceTypeLabel}</p>
+                  </div>
+                  <p className="text-sm text-zinc-300">
+                    {resource.headline ?? "Verified Talent"}
+                  </p>
                 </div>
               </>
             );

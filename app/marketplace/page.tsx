@@ -18,7 +18,7 @@ export default async function MarketplacePage() {
   const { data, error } = await supabase
     .from("resources")
     .select(
-      "id, name, headline, location, hourly_rate, years_experience, bio, profile_status, created_at, available_from, avatar_key",
+      "id, name, headline, location, hourly_rate, years_experience, bio, profile_status, created_at, available_from, avatar_key, industry, resource_type, other_resource_type",
     )
     .eq("profile_status", "approved")
     .order("created_at", { ascending: false });
@@ -73,6 +73,9 @@ export default async function MarketplacePage() {
       years_experience: (r.years_experience as number | null) ?? null,
       bio: (r.bio as string | null) ?? null,
       avatar_key: (r.avatar_key as string | null) ?? null,
+      industry: (r.industry as string | null) ?? null,
+      resource_type: (r.resource_type as string | null) ?? null,
+      other_resource_type: (r.other_resource_type as string | null) ?? null,
       available_from: af != null && String(af).trim() !== "" ? String(af).slice(0, 10) : null,
       next_blocked_date: nextBlocked,
     };

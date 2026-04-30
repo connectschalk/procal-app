@@ -374,7 +374,7 @@ export default function ConsultantDashboardPage() {
     const { data: resourceRows, error: resourcesError } = await supabase
       .from("resources")
       .select(
-        "id, name, claimed, available_from, headline, bio, hourly_rate, location, avatar_key, profile_photo_path, cv_document_path, id_front_document_path, id_back_document_path",
+        "id, name, claimed, available_from, headline, bio, hourly_rate, location, industry, resource_type, other_resource_type, avatar_key, profile_photo_path, cv_document_path, id_front_document_path, id_back_document_path",
       )
       .ilike("contact_email", trimmed);
 
@@ -412,6 +412,9 @@ export default function ConsultantDashboardPage() {
           bio: string | null;
           hourly_rate: number | null;
           location: string | null;
+          industry: string | null;
+          resource_type: string | null;
+          other_resource_type: string | null;
           avatar_key: string | null;
           profile_photo_path: string | null;
           cv_document_path: string | null;
@@ -426,7 +429,12 @@ export default function ConsultantDashboardPage() {
         Boolean(claimedResource.headline && claimedResource.headline.trim() !== "") &&
         Boolean(claimedResource.bio && claimedResource.bio.trim() !== "") &&
         claimedResource.hourly_rate != null &&
-        Boolean(claimedResource.location && claimedResource.location.trim() !== "");
+        Boolean(claimedResource.location && claimedResource.location.trim() !== "") &&
+        Boolean(claimedResource.industry && claimedResource.industry.trim() !== "") &&
+        Boolean(claimedResource.resource_type && claimedResource.resource_type.trim() !== "") &&
+        (!(
+          claimedResource.industry === "Other" || claimedResource.resource_type === "Other"
+        ) || Boolean(claimedResource.other_resource_type && claimedResource.other_resource_type.trim() !== ""));
       const avatarComplete = Boolean(claimedResource.avatar_key && claimedResource.avatar_key.trim() !== "");
       const photoComplete = Boolean(
         claimedResource.profile_photo_path && claimedResource.profile_photo_path.trim() !== "",

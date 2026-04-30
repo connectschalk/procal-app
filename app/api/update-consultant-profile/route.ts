@@ -1,4 +1,5 @@
 import { isValidTalentAvatarKey } from "@/lib/talent-avatar-library";
+import { OTHER_TALENT_OPTION, isCoreTalentIndustry } from "@/lib/talent-taxonomy";
 import { createServiceRoleSupabase } from "@/lib/supabase-service-role";
 import { NextResponse } from "next/server";
 
@@ -9,6 +10,9 @@ type Body = {
   bio?: unknown;
   hourly_rate?: unknown;
   location?: unknown;
+  industry?: unknown;
+  resource_type?: unknown;
+  other_resource_type?: unknown;
   avatar_key?: unknown;
   /** Only null is accepted from clients to clear; non-null paths must be set via upload API. */
   profile_photo_path?: unknown;
@@ -70,6 +74,9 @@ export async function POST(request: Request) {
   const headline = typeof json.headline === "string" ? json.headline.trim() || null : null;
   const bio = typeof json.bio === "string" ? json.bio.trim() || null : null;
   const location = typeof json.location === "string" ? json.location.trim() || null : null;
+  const industry = typeof json.industry === "string" ? json.industry.trim() || null : null;
+  const resource_type = typeof json.resource_type === "string" ? json.resource_type.trim() || null : null;
+  const other_resource_type = typeof json.other_resource_type === "string" ? json.other_resource_type.trim() || null : null;
 
   const rateResult = parseHourlyRate(json.hourly_rate);
   if (!rateResult.ok) {
@@ -79,6 +86,18 @@ export async function POST(request: Request) {
     );
   }
   const hourly_rate = rateResult.value;
+  if (industry == null || industry === "") {
+    return NextResponse.json({ success: false, error: "industry is required" }, { status: 400 });
+  }
+  if (!(isCoreTalentIndustry(industry) || industry === OTHER_TALENT_OPTION)) {
+    return NextResponse.json({ success: false, error: "Invalid industry" }, { status: 400 });
+  }
+  if (resource_type == null || resource_type === "") {
+    return NextResponse.json({ success: false, error: "resource_type is required" }, { status: 400 });
+  }
+  if ((industry === OTHER_TALENT_OPTION || resource_type === OTHER_TALENT_OPTION) && (other_resource_type == null || other_resource_type === "")) {
+    return NextResponse.json({ success: false, error: "other_resource_type is required when using Other" }, { status: 400 });
+  }
 
   let avatarKeyUpdate: string | null | undefined;
   if ("avatar_key" in json) {
@@ -153,6 +172,9 @@ export async function POST(request: Request) {
     bio,
     hourly_rate,
     location,
+    industry,
+    resource_type,
+    other_resource_type: other_resource_type === "" ? null : other_resource_type,
   };
   if (avatarKeyUpdate !== undefined) {
     patch.avatar_key = avatarKeyUpdate;

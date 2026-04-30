@@ -5,6 +5,7 @@ import {
   MarketplaceConsultantGrid,
   type MarketplaceResource,
 } from "@/components/marketplace-consultant-grid";
+import { getResourceTypeLabel } from "@/lib/resource-display";
 
 const ACCENT = "#ff6a00";
 
@@ -16,7 +17,13 @@ function matchesSearch(resource: MarketplaceResource, query: string) {
   if (!query) return true;
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  const haystack = [resource.anonymized_display_name, resource.headline ?? "", resource.bio ?? ""]
+  const haystack = [
+    resource.anonymized_display_name,
+    resource.headline ?? "",
+    resource.bio ?? "",
+    resource.industry ?? "",
+    getResourceTypeLabel(resource),
+  ]
     .join(" ")
     .toLowerCase();
   return haystack.includes(q);

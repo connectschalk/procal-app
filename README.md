@@ -37,7 +37,7 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 ## Supabase email confirmation
 
-With email confirmation enabled, the app sets `emailRedirectTo` to `{origin}/auth/callback` on sign-up so users land in the role-based dashboard after confirming.
+With email confirmation enabled, the app sets `emailRedirectTo` to `${NEXT_PUBLIC_SITE_URL}/auth/callback` when **`NEXT_PUBLIC_SITE_URL`** is set (e.g. `https://procal.co.za`), so confirmation links open production rather than localhost. If unset, it falls back to the browser origin during sign-up (fine for local dev).
 
 In the Supabase dashboard, add your callback URL under **Authentication → URL configuration → Redirect URLs** (e.g. `https://procal.co.za/auth/callback` and `http://localhost:3000/auth/callback` for dev).
 

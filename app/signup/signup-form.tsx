@@ -47,12 +47,18 @@ export function SignupForm({ initialRole }: { initialRole: SignupRole }) {
     setError(null);
     setBusy(true);
 
+    const siteUrl =
+      process.env.NEXT_PUBLIC_SITE_URL != null && process.env.NEXT_PUBLIC_SITE_URL.trim() !== ""
+        ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
+        : typeof window !== "undefined"
+          ? window.location.origin
+          : "";
     const { data, error: signErr } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
         data: { role },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${siteUrl}/auth/callback`,
       },
     });
 

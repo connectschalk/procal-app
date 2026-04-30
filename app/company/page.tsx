@@ -6,9 +6,10 @@ import { AppTopNav } from "@/components/app-top-nav";
 import { createInterviewIcs } from "@/lib/calendar-invite";
 import { isCompanyProfileComplete } from "@/lib/company-profile";
 import { getPublicTalentAvatarDisplay } from "@/lib/talent-avatar-library";
+import { WelcomeToProcalModal } from "@/components/welcome-to-procal-modal";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
-import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type InterviewRequestRow = {
   id: string;
@@ -78,6 +79,26 @@ type CompanyProfile = {
   description: string;
   talent_interests: string[];
 };
+
+type CompanyProfileInlineErrors = Partial<
+  Record<"company_name" | "contact_person" | "contact_email", string>
+>;
+
+function mapApiProfileToState(p: Partial<CompanyProfile> | null | undefined): CompanyProfile {
+  return {
+    company_name: typeof p?.company_name === "string" ? p.company_name : "",
+    logo_path: typeof p?.logo_path === "string" ? p.logo_path : "",
+    contact_person: typeof p?.contact_person === "string" ? p.contact_person : "",
+    contact_email: typeof p?.contact_email === "string" ? p.contact_email : "",
+    contact_number: typeof p?.contact_number === "string" ? p.contact_number : "",
+    website: typeof p?.website === "string" ? p.website : "",
+    location: typeof p?.location === "string" ? p.location : "",
+    description: typeof p?.description === "string" ? p.description : "",
+    talent_interests: Array.isArray(p?.talent_interests)
+      ? p.talent_interests.filter((v): v is string => typeof v === "string")
+      : [],
+  };
+}
 
 type RequirementRow = {
   id: string;
@@ -243,6 +264,7 @@ function consultantProfileHref(resourceId: string) {
 }
 
 export default function CompanyDashboardPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const requestedSection = searchParams.get("section");
   const initialSection: ActiveSection =
@@ -265,6 +287,7 @@ export default function CompanyDashboardPage() {
   const [hasCompanyProfile, setHasCompanyProfile] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileInlineErrors, setProfileInlineErrors] = useState<CompanyProfileInlineErrors>({});
   const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
   const [profile, setProfile] = useState<CompanyProfile>({
     company_name: "",
@@ -279,6 +302,9 @@ export default function CompanyDashboardPage() {
   });
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null);
+  const [pendingLogoPreviewUrl, setPendingLogoPreviewUrl] = useState<string | null>(null);
+  const pendingLogoObjectUrlRef = useRef<string | null>(null);
   const [requirementsLoading, setRequirementsLoading] = useState(true);
   const [requirementsError, setRequirementsError] = useState<string | null>(null);
   const [requirements, setRequirements] = useState<RequirementRow[]>([]);
@@ -326,6 +352,24 @@ export default function CompanyDashboardPage() {
   const ghostButtonClass =
     "inline-flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 px-6 py-3 text-sm font-medium text-zinc-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60 md:w-auto";
 
+  const clearPendingLogo = useCallback(() => {
+    if (pendingLogoObjectUrlRef.current != null) {
+      URL.revokeObjectURL(pendingLogoObjectUrlRef.current);
+      pendingLogoObjectUrlRef.current = null;
+    }
+    setPendingLogoPreviewUrl(null);
+    setPendingLogoFile(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (pendingLogoObjectUrlRef.current != null) {
+        URL.revokeObjectURL(pendingLogoObjectUrlRef.current);
+        pendingLogoObjectUrlRef.current = null;
+      }
+    };
+  }, []);
+
   const loadCompanyProfile = useCallback(async () => {
     setProfileLoading(true);
     setProfileError(null);
@@ -340,26 +384,16 @@ export default function CompanyDashboardPage() {
       if (json.error) setProfileError(json.error);
       return;
     }
-    const p = json.profile ?? {};
-    setHasCompanyProfile(json.profile != null);
-    setProfile({
-      company_name: typeof p.company_name === "string" ? p.company_name : "",
-      logo_path: typeof p.logo_path === "string" ? p.logo_path : "",
-      contact_person: typeof p.contact_person === "string" ? p.contact_person : "",
-      contact_email: typeof p.contact_email === "string" ? p.contact_email : "",
-      contact_number: typeof p.contact_number === "string" ? p.contact_number : "",
-      website: typeof p.website === "string" ? p.website : "",
-      location: typeof p.location === "string" ? p.location : "",
-      description: typeof p.description === "string" ? p.description : "",
-      talent_interests: Array.isArray(p.talent_interests)
-        ? p.talent_interests.filter((v): v is string => typeof v === "string")
-        : [],
-    });
-    if (!(typeof p.logo_path === "string" && p.logo_path.trim() !== "")) {
+    setProfileError(null);
+    clearPendingLogo();
+    const p = json.profile ?? null;
+    setHasCompanyProfile(p != null);
+    setProfile(mapApiProfileToState(p ?? undefined));
+    if (!(typeof p?.logo_path === "string" && p.logo_path.trim() !== "")) {
       setLogoPreview(null);
     }
     setProfileLoading(false);
-  }, []);
+  }, [clearPendingLogo]);
 
   const loadRequirements = useCallback(async () => {
     setRequirementsLoading(true);
@@ -699,66 +733,89 @@ export default function CompanyDashboardPage() {
     });
   }, []);
 
+  const onLogoFileChosen = useCallback((file: File) => {
+    setProfileError(null);
+    setProfileSuccess(null);
+    if (pendingLogoObjectUrlRef.current != null) {
+      URL.revokeObjectURL(pendingLogoObjectUrlRef.current);
+    }
+    const url = URL.createObjectURL(file);
+    pendingLogoObjectUrlRef.current = url;
+    setPendingLogoPreviewUrl(url);
+    setPendingLogoFile(file);
+  }, []);
+
   const saveProfile = useCallback(async () => {
     setProfileSaving(true);
     setProfileError(null);
     setProfileSuccess(null);
-    if (!hasCompanyProfile) {
-      const missing = [
-        profile.company_name.trim() === "",
-        profile.contact_person.trim() === "",
-        profile.contact_email.trim() === "",
-      ].some(Boolean);
-      if (missing) {
-        setProfileSaving(false);
-        setProfileError("Complete company name, contact person and contact email before saving.");
-        return;
-      }
+    const inline: CompanyProfileInlineErrors = {};
+    if (profile.company_name.trim() === "") {
+      inline.company_name = "Company name is required.";
     }
+    if (profile.contact_person.trim() === "") {
+      inline.contact_person = "Contact person is required.";
+    }
+    if (profile.contact_email.trim() === "") {
+      inline.contact_email = "Contact email is required.";
+    }
+    if (Object.keys(inline).length > 0) {
+      setProfileInlineErrors(inline);
+      setProfileSaving(false);
+      return;
+    }
+    setProfileInlineErrors({});
+    const pendingFile = pendingLogoFile;
     const res = await fetch("/api/update-company-profile", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(profile),
     });
-    const json = (await res.json().catch(() => ({}))) as { success?: boolean; error?: string };
+    const json = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      error?: string;
+      profile?: Partial<CompanyProfile> | null;
+    };
     if (!res.ok || json.success !== true) {
       setProfileSaving(false);
       setProfileError(json.error ?? "Could not save company profile");
       return;
     }
-    const created = !hasCompanyProfile;
-    if (created) setHasCompanyProfile(true);
-    setProfileSaving(false);
-    setProfileSuccess(created ? "Company profile created." : "Company profile updated.");
-  }, [profile, hasCompanyProfile]);
+    if (json.profile != null) {
+      setProfile(mapApiProfileToState(json.profile));
+    }
+    setHasCompanyProfile(true);
 
-  const onLogoSelected = useCallback(async (file: File) => {
-    if (!hasCompanyProfile) {
-      setProfileError("Save your company profile first, then upload a logo.");
-      return;
-    }
-    setLogoUploading(true);
-    setProfileError(null);
-    const form = new FormData();
-    form.set("file", file);
-    const res = await fetch("/api/upload-company-logo", { method: "POST", body: form });
-    const json = (await res.json().catch(() => ({}))) as {
-      success?: boolean;
-      error?: string;
-      path?: string;
-      publicUrl?: string | null;
-      signedUrl?: string | null;
-    };
-    if (!res.ok || json.success !== true || !json.path) {
+    let logoUploaded = false;
+    if (pendingFile != null) {
+      setLogoUploading(true);
+      const form = new FormData();
+      form.set("file", pendingFile);
+      const upRes = await fetch("/api/upload-company-logo", { method: "POST", body: form });
+      const upJson = (await upRes.json().catch(() => ({}))) as {
+        success?: boolean;
+        error?: string;
+        path?: string;
+        publicUrl?: string | null;
+        signedUrl?: string | null;
+      };
       setLogoUploading(false);
-      setProfileError(json.error ?? "Could not upload logo");
-      return;
+      if (!upRes.ok || upJson.success !== true || !upJson.path) {
+        setProfileSaving(false);
+        setProfileError(upJson.error ?? "Could not upload logo");
+        return;
+      }
+      logoUploaded = true;
+      clearPendingLogo();
+      setProfile((prev) => ({ ...prev, logo_path: upJson.path as string }));
+      setLogoPreview((upJson.signedUrl ?? upJson.publicUrl) ?? null);
     }
-    setProfile((prev) => ({ ...prev, logo_path: json.path as string }));
-    setLogoPreview((json.signedUrl ?? json.publicUrl) ?? null);
-    setLogoUploading(false);
-    setProfileSuccess("Logo uploaded.");
-  }, [hasCompanyProfile]);
+
+    setProfileSaving(false);
+    const lines = ["Company profile saved."];
+    if (logoUploaded) lines.push("Logo uploaded.");
+    setProfileSuccess(lines.join("\n"));
+  }, [profile, pendingLogoFile, clearPendingLogo]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1025,6 +1082,11 @@ export default function CompanyDashboardPage() {
     [],
   );
 
+  const showWelcomeModal = searchParams.get("welcome") === "1";
+  const dismissWelcomeModal = useCallback(() => {
+    router.replace("/company");
+  }, [router]);
+
   return (
     <>
       <AppTopNav />
@@ -1172,90 +1234,141 @@ export default function CompanyDashboardPage() {
               <h2 className="text-lg font-semibold text-zinc-100">Company profile</h2>
               <button
                 type="button"
-                disabled={profileSaving}
+                disabled={profileSaving || logoUploading}
                 onClick={saveProfile}
                 className={primaryButtonClass}
               >
-                {profileSaving ? "Saving..." : "Save profile"}
+                {profileSaving || logoUploading ? "Saving..." : "Save profile"}
               </button>
             </div>
             <p className="mt-1 text-sm text-zinc-400">
               Keep your workspace profile up to date so talent sees the right context.
             </p>
             {!hasCompanyProfile && !profileLoading ? (
-              <p className="mt-2 text-sm text-zinc-400">Create your company profile to start engaging talent.</p>
+              <p className="mt-2 text-sm text-zinc-300">Create your company profile to start engaging talent.</p>
             ) : null}
             {profileLoading ? <p className="mt-3 text-sm text-zinc-500">Loading company profile...</p> : null}
             {profileError ? <p className="mt-3 text-sm text-red-300">{profileError}</p> : null}
-            {profileSuccess ? <p className="mt-3 text-sm text-emerald-300">{profileSuccess}</p> : null}
+            {profileSuccess ? (
+              <div className="mt-3 space-y-1 text-sm text-emerald-300">
+                {profileSuccess.split("\n").map((line, idx) => (
+                  <p key={`${idx}-${line.slice(0, 12)}`}>{line}</p>
+                ))}
+              </div>
+            ) : null}
 
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <label className="space-y-2">
                 <span className="text-xs font-medium uppercase tracking-wide text-zinc-400">Company name</span>
                 <input
                   value={profile.company_name}
-                  onChange={(e) => setProfile((prev) => ({ ...prev, company_name: e.target.value }))}
+                  onChange={(e) => {
+                    setProfile((prev) => ({ ...prev, company_name: e.target.value }));
+                    setProfileInlineErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.company_name;
+                      return next;
+                    });
+                  }}
                   className={inputClass}
+                  aria-invalid={profileInlineErrors.company_name != null}
                 />
+                {profileInlineErrors.company_name ? (
+                  <p className="text-xs text-amber-200/90">{profileInlineErrors.company_name}</p>
+                ) : null}
               </label>
               <div className="space-y-2">
                 <span className="text-xs font-medium uppercase tracking-wide text-zinc-400">Logo</span>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <div className="h-14 w-14 overflow-hidden rounded-xl border border-zinc-700 bg-black/40">
-                    {logoPreview != null ? (
+                    {pendingLogoPreviewUrl != null ? (
+                      <Image
+                        src={pendingLogoPreviewUrl}
+                        alt="Logo preview"
+                        className="h-full w-full object-cover"
+                        width={56}
+                        height={56}
+                        unoptimized
+                      />
+                    ) : logoPreview != null ? (
                       <Image src={logoPreview} alt="Company logo" className="h-full w-full object-cover" width={56} height={56} />
-                    ) : profile.logo_path ? (
+                    ) : profile.logo_path.trim() !== "" ? (
                       <div className="flex h-full items-center justify-center text-[10px] text-green-400">Uploaded</div>
                     ) : (
-                      <div className="flex h-full items-center justify-center text-[10px] text-amber-200/90">Missing</div>
+                      <div className="flex h-full items-center justify-center px-1 text-center text-[10px] text-zinc-500">
+                        Optional
+                      </div>
                     )}
                   </div>
                   <label
-                    className={`inline-flex items-center rounded-lg border border-zinc-700 bg-black/40 px-3 py-2 text-sm text-zinc-200 ${
-                      hasCompanyProfile ? "cursor-pointer hover:border-zinc-500" : "cursor-not-allowed opacity-60"
+                    className={`inline-flex cursor-pointer items-center rounded-lg border border-zinc-700 bg-black/40 px-3 py-2 text-sm text-zinc-200 hover:border-zinc-500 ${
+                      profileSaving || logoUploading ? "pointer-events-none opacity-60" : ""
                     }`}
                   >
-                    {profile.logo_path ? "Replace logo" : "Choose logo"}
+                    {profile.logo_path.trim() !== "" ? "Replace logo" : "Choose logo"}
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/webp"
                       className="hidden"
-                      disabled={!hasCompanyProfile || logoUploading}
+                      disabled={profileSaving || logoUploading}
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
-                        void onLogoSelected(file);
+                        onLogoFileChosen(file);
                         e.currentTarget.value = "";
                       }}
                     />
                   </label>
                   {logoUploading ? <span className="text-xs text-zinc-500">Uploading...</span> : null}
-                  {!logoUploading && profile.logo_path ? (
+                  {!logoUploading && pendingLogoFile != null ? (
+                    <span className="text-xs font-medium text-sky-300/90">Ready to upload after save</span>
+                  ) : null}
+                  {!logoUploading && pendingLogoFile == null && profile.logo_path.trim() !== "" ? (
                     <span className="text-xs font-medium text-green-400">✓ Uploaded</span>
                   ) : null}
-                  {!logoUploading && !profile.logo_path ? (
-                    <span className="text-xs font-medium text-amber-200/90">Missing</span>
+                  {!logoUploading && pendingLogoFile == null && profile.logo_path.trim() === "" ? (
+                    <span className="text-xs font-medium text-zinc-500">Optional</span>
                   ) : null}
                 </div>
-                {!hasCompanyProfile ? (
-                  <p className="text-xs text-zinc-500">Save your company profile first, then upload a logo.</p>
-                ) : null}
+                <p className="text-xs text-zinc-500">Optional. You can add or replace this later.</p>
               </div>
               <label className="space-y-2">
                 <span className="text-xs font-medium uppercase tracking-wide text-zinc-400">Contact person</span>
                 <input
                   value={profile.contact_person}
-                  onChange={(e) => setProfile((prev) => ({ ...prev, contact_person: e.target.value }))}
+                  onChange={(e) => {
+                    setProfile((prev) => ({ ...prev, contact_person: e.target.value }));
+                    setProfileInlineErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.contact_person;
+                      return next;
+                    });
+                  }}
                   className={inputClass}
+                  aria-invalid={profileInlineErrors.contact_person != null}
                 />
+                {profileInlineErrors.contact_person ? (
+                  <p className="text-xs text-amber-200/90">{profileInlineErrors.contact_person}</p>
+                ) : null}
               </label>
               <label className="space-y-2">
                 <span className="text-xs font-medium uppercase tracking-wide text-zinc-400">Contact email</span>
                 <input
                   value={profile.contact_email}
-                  onChange={(e) => setProfile((prev) => ({ ...prev, contact_email: e.target.value }))}
+                  onChange={(e) => {
+                    setProfile((prev) => ({ ...prev, contact_email: e.target.value }));
+                    setProfileInlineErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.contact_email;
+                      return next;
+                    });
+                  }}
                   className={inputClass}
+                  aria-invalid={profileInlineErrors.contact_email != null}
                 />
+                {profileInlineErrors.contact_email ? (
+                  <p className="text-xs text-amber-200/90">{profileInlineErrors.contact_email}</p>
+                ) : null}
               </label>
               <label className="space-y-2">
                 <span className="text-xs font-medium uppercase tracking-wide text-zinc-400">Contact number</span>
@@ -1993,6 +2106,12 @@ export default function CompanyDashboardPage() {
           </div>
         </div>
       ) : null}
+      <WelcomeToProcalModal
+        open={showWelcomeModal}
+        onClose={dismissWelcomeModal}
+        variant="company"
+        onCompanyCompleteProfile={() => setActiveSection("profile")}
+      />
     </>
   );
 }

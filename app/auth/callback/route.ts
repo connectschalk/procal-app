@@ -96,8 +96,11 @@ export async function GET(request: NextRequest) {
     return response;
   }
 
-  const path = dashboardPathForRole(role);
-  const response = NextResponse.redirect(new URL(path, origin));
+  const basePath = dashboardPathForRole(role);
+  /** Post–email-confirmation: welcome modal on company/talent dashboards (not admin). */
+  const destination =
+    role === "admin" ? basePath : `${basePath}?welcome=1`;
+  const response = NextResponse.redirect(new URL(destination, origin));
   applyCookies(response, cookieJar);
   return response;
 }

@@ -1,12 +1,14 @@
 "use client";
 
 import { AppTopNav } from "@/components/app-top-nav";
+import { WelcomeToProcalModal } from "@/components/welcome-to-procal-modal";
 import { createInterviewIcs } from "@/lib/calendar-invite";
 import { interviewAcceptedEmail } from "@/lib/email-placeholders";
 import { sendEmailClient } from "@/lib/send-email-client";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 type InterviewRequestRow = {
   id: string;
@@ -165,6 +167,18 @@ function proposedSlots(row: InterviewRequestRow): string[] {
   return [row.proposed_slot_1, row.proposed_slot_2, row.proposed_slot_3].filter(
     (slot): slot is string => slot != null && slot.trim() !== "",
   );
+}
+
+function TalentWelcomeModalHost() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const showWelcomeModal = searchParams.get("welcome") === "1";
+  const dismissWelcomeModal = useCallback(() => {
+    const path = pathname != null && pathname !== "" ? pathname : "/talent";
+    router.replace(path);
+  }, [router, pathname]);
+  return <WelcomeToProcalModal open={showWelcomeModal} onClose={dismissWelcomeModal} variant="talent" />;
 }
 
 function actionableSlots(row: InterviewRequestRow): string[] {
@@ -1128,6 +1142,9 @@ export default function ConsultantDashboardPage() {
         ) : null}
         </main>
       </div>
+      <Suspense fallback={null}>
+        <TalentWelcomeModalHost />
+      </Suspense>
     </>
   );
 }

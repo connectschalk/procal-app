@@ -35,6 +35,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "Wrong role for this action" }, { status: 403 });
   }
 
+  const { data: profileRow, error: profileLookupError } = await admin
+    .from("company_profiles")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (profileLookupError != null) {
+    console.error("[upload-company-logo] profile lookup", profileLookupError);
+    return NextResponse.json({ success: false, error: "Could not verify company profile" }, { status: 500 });
+  }
+  if (profileRow == null) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Save your company profile first, then upload a logo.",
+      },
+      { status: 400 },
+    );
+  }
+
   let form: FormData;
   try {
     form = await request.formData();
@@ -76,15 +96,6 @@ export async function POST(request: Request) {
       );
     }
     return NextResponse.json({ success: false, error: "Could not upload logo" }, { status: 500 });
-  }
-
-  const { data: profileRow } = await admin
-    .from("company_profiles")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (profileRow == null) {
-    return NextResponse.json({ success: false, error: "No profile found" }, { status: 404 });
   }
 
   const { error: dbErr } = await admin

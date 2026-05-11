@@ -1,6 +1,6 @@
 "use client";
 
-import { todayCalendarIsoJohannesburg } from "@/lib/resource-availability";
+import { normalizeCalendarDateFromDb, todayCalendarIsoJohannesburg } from "@/lib/resource-availability";
 import { useMemo, useState } from "react";
 
 const WEEKDAY_LABELS_MON = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
@@ -87,8 +87,8 @@ export function PublicAvailabilityCalendar({
   const blockedByIso = useMemo(() => {
     const m = new Map<string, string | null>();
     for (const b of blockedDates) {
-      const iso = String(b.blocked_date).slice(0, 10);
-      if (!ISO_DATE_RE.test(iso)) continue;
+      const iso = normalizeCalendarDateFromDb(String(b.blocked_date));
+      if (iso == null || !ISO_DATE_RE.test(iso)) continue;
       const r = b.reason;
       const trimmed = typeof r === "string" && r.trim() !== "" ? r.trim() : null;
       m.set(iso, trimmed);
@@ -97,11 +97,10 @@ export function PublicAvailabilityCalendar({
   }, [blockedDates]);
 
   const hasAnyBlocked = blockedByIso.size > 0;
-  const fromRaw =
+  const effectiveFrom =
     availableFrom != null && String(availableFrom).trim() !== ""
-      ? String(availableFrom).trim().slice(0, 10)
+      ? normalizeCalendarDateFromDb(String(availableFrom))
       : null;
-  const effectiveFrom = fromRaw != null && ISO_DATE_RE.test(fromRaw) ? fromRaw : null;
   const todayIso = todayCalendarIsoJohannesburg();
 
   const cells = useMemo(

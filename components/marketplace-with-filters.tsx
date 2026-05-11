@@ -5,6 +5,7 @@ import {
   MarketplaceConsultantGrid,
   type MarketplaceResource,
 } from "@/components/marketplace-consultant-grid";
+import { normalizeCalendarDateFromDb } from "@/lib/resource-availability";
 import { getResourceTypeLabel } from "@/lib/resource-display";
 
 const ACCENT = "#ff6a00";
@@ -32,12 +33,14 @@ function matchesSearch(resource: MarketplaceResource, query: string) {
 function buildBlockedByResource(rows: { resource_id: string; blocked_date: string }[]) {
   const map = new Map<string, Set<string>>();
   for (const row of rows) {
+    const iso = normalizeCalendarDateFromDb(row.blocked_date);
+    if (iso == null) continue;
     let set = map.get(row.resource_id);
     if (set == null) {
       set = new Set<string>();
       map.set(row.resource_id, set);
     }
-    set.add(row.blocked_date);
+    set.add(iso);
   }
   return map;
 }
@@ -47,12 +50,14 @@ function passesAvailableByDate(
   selectedIso: string,
   blockedByResource: Map<string, Set<string>>,
 ): boolean {
+  const selected = normalizeCalendarDateFromDb(selectedIso) ?? selectedIso.trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(selected)) return true;
   const af = resource.available_from;
-  if (af != null && af.trim() !== "" && af > selectedIso) {
+  if (af != null && af.trim() !== "" && af > selected) {
     return false;
   }
   const blocked = blockedByResource.get(resource.id);
-  if (blocked != null && blocked.has(selectedIso)) {
+  if (blocked != null && blocked.has(selected)) {
     return false;
   }
   return true;

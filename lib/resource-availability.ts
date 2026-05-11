@@ -15,16 +15,43 @@ export function todayCalendarIsoJohannesburg(now: Date = new Date()): string {
   }).format(now);
 }
 
-export function normalizeIsoDate(raw: string | null | undefined): string | null {
+/** Calendar YYYY-MM-DD for an instant in Africa/Johannesburg (civil date). */
+export function calendarIsoInJohannesburgFromInstant(instant: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(instant);
+}
+
+/**
+ * Normalizes Postgres `date` / API values to a civil calendar ISO date.
+ * `slice(0, 10)` on `…T22:00:00.000Z` can shift the day; this uses Johannesburg for timestamps.
+ */
+export function normalizeCalendarDateFromDb(raw: string | null | undefined): string | null {
   if (raw == null) return null;
-  const s = String(raw).trim().slice(0, 10);
-  return ISO_DATE_RE.test(s) ? s : null;
+  const s = String(raw).trim();
+  if (s === "") return null;
+  if (ISO_DATE_RE.test(s)) return s;
+  const prefix = s.slice(0, 10);
+  if (!ISO_DATE_RE.test(prefix)) return null;
+  if (s.length === 10) return prefix;
+  const sep = s[10];
+  if (sep !== "T" && sep !== " " && sep !== "t") return prefix;
+  const ms = Date.parse(s);
+  if (Number.isNaN(ms)) return prefix;
+  return calendarIsoInJohannesburgFromInstant(new Date(ms));
+}
+
+export function normalizeIsoDate(raw: string | null | undefined): string | null {
+  return normalizeCalendarDateFromDb(raw);
 }
 
 export function uniqueSortedIsoDates(dates: string[]): string[] {
   const set = new Set<string>();
   for (const d of dates) {
-    const n = normalizeIsoDate(d);
+    const n = normalizeCalendarDateFromDb(d);
     if (n != null) set.add(n);
   }
   return [...set].sort((a, b) => a.localeCompare(b));

@@ -1,6 +1,7 @@
 import { AppTopNav } from "@/components/app-top-nav";
 import { MarketplaceWithFilters } from "@/components/marketplace-with-filters";
 import type { MarketplaceResource } from "@/components/marketplace-consultant-grid";
+import { normalizeCalendarDateFromDb } from "@/lib/resource-availability";
 import { getAnonymizedTalentDisplayName, getCompanyRelationshipMap } from "@/lib/talent-identity";
 import { supabase } from "@/lib/supabase";
 
@@ -29,10 +30,12 @@ export default async function MarketplacePage() {
 
     blockedDataLoadOk = blockedError == null;
     if (blockedDataLoadOk && blockedData != null) {
-      blockedDateRows = blockedData.map((row) => ({
-        resource_id: row.resource_id as string,
-        blocked_date: String(row.blocked_date).slice(0, 10),
-      }));
+      blockedDateRows = blockedData
+        .map((row) => ({
+          resource_id: row.resource_id as string,
+          blocked_date: normalizeCalendarDateFromDb(String(row.blocked_date)),
+        }))
+        .filter((row): row is { resource_id: string; blocked_date: string } => row.blocked_date != null);
     }
   }
 
@@ -64,7 +67,8 @@ export default async function MarketplacePage() {
       industry: (r.industry as string | null) ?? null,
       resource_type: (r.resource_type as string | null) ?? null,
       other_resource_type: (r.other_resource_type as string | null) ?? null,
-      available_from: af != null && String(af).trim() !== "" ? String(af).slice(0, 10) : null,
+      available_from:
+        af != null && String(af).trim() !== "" ? normalizeCalendarDateFromDb(String(af)) ?? null : null,
       blocked_dates_iso: blockedDatesByResource.get(id) ?? [],
       blocked_data_load_ok: blockedDataLoadOk,
       id_validation_status: (r.id_validation_status as string | null) ?? null,

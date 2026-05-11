@@ -6,7 +6,7 @@ import { getCompanyProfileByUserId, getUserRoleById } from "@/lib/company-profil
 import { getAnonymizedTalentDisplayName, getCompanyRelationshipMap } from "@/lib/talent-identity";
 import { getPublicTalentAvatarDisplay } from "@/lib/talent-avatar-library";
 import { PublicAvailabilitySummary } from "@/components/public-availability-summary";
-import { computePublicAvailabilityView } from "@/lib/resource-availability";
+import { computePublicAvailabilityView, normalizeCalendarDateFromDb } from "@/lib/resource-availability";
 import { getResourceCategoryLabel } from "@/lib/resource-display";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { supabase } from "@/lib/supabase";
@@ -183,7 +183,7 @@ export default async function ConsultantProfilePage({ params }: PageProps) {
   const availableFromRaw = data.available_from as string | null | undefined;
   const availableFrom =
     availableFromRaw != null && String(availableFromRaw).trim() !== ""
-      ? String(availableFromRaw).slice(0, 10)
+      ? normalizeCalendarDateFromDb(String(availableFromRaw))
       : null;
 
   const { data: blockedRows, error: blockedError } = await supabase
@@ -194,10 +194,13 @@ export default async function ConsultantProfilePage({ params }: PageProps) {
 
   const blockedForCalendar =
     !blockedError && blockedRows != null
-      ? (blockedRows as { blocked_date: string; reason: string | null }[]).map((r) => ({
-          blocked_date: String(r.blocked_date).slice(0, 10),
-          reason: r.reason,
-        }))
+      ? (blockedRows as { blocked_date: string; reason: string | null }[])
+          .map((r) => {
+            const iso = normalizeCalendarDateFromDb(String(r.blocked_date));
+            if (iso == null) return null;
+            return { blocked_date: iso, reason: r.reason };
+          })
+          .filter((r): r is { blocked_date: string; reason: string | null } => r != null)
       : [];
 
   const publicAvailabilityView = computePublicAvailabilityView({

@@ -1,6 +1,7 @@
 import {
   type PublicAvailabilityView,
   formatAvailabilityMediumDate,
+  todayCalendarIsoJohannesburg,
 } from "@/lib/resource-availability";
 
 /**
@@ -13,6 +14,7 @@ export function PublicAvailabilitySummary({
   view: PublicAvailabilityView;
   size?: "xs" | "sm";
 }) {
+  const todaySast = todayCalendarIsoJohannesburg();
   const wrap = size === "sm" ? "space-y-2 text-sm leading-snug" : "space-y-1 text-xs leading-snug";
   const labelClass = "text-zinc-500";
   const primaryClass =
@@ -47,11 +49,8 @@ export function PublicAvailabilitySummary({
           <span className={`font-medium ${primaryClass}`}>Unavailable today</span>
         </p>
       ) : view.variant === "available_from" ? (
-        <p>
-          <span className={labelClass}>Availability</span>{" "}
-          <span className={`font-medium ${primaryClass}`}>
-            From {formatAvailabilityMediumDate(view.availableFromIso!)}
-          </span>
+        <p className={`font-medium ${primaryClass}`}>
+          Available from {formatAvailabilityMediumDate(view.availableFromIso!)}
         </p>
       ) : (
         <p>
@@ -59,7 +58,9 @@ export function PublicAvailabilitySummary({
           <span className={`font-medium ${primaryClass}`}>Available now</span>
         </p>
       )}
-      {view.variant === "available_now" && view.nextUnavailableIso != null ? (
+      {view.variant === "available_now" &&
+      view.nextUnavailableIso != null &&
+      view.nextUnavailableIso > todaySast ? (
         <p className="text-zinc-500">
           Next unavailable:{" "}
           <span className="text-zinc-400">{formatAvailabilityMediumDate(view.nextUnavailableIso)}</span>

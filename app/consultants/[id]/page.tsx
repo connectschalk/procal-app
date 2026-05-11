@@ -1,3 +1,4 @@
+import { IdNumberVerifiedIndicator } from "@/components/id-number-verified-indicator";
 import { AppTopNav } from "@/components/app-top-nav";
 import { PublicAvailabilityCalendar } from "@/components/public-availability-calendar";
 import { isCompanyProfileComplete } from "@/lib/company-profile";
@@ -148,7 +149,7 @@ export default async function ConsultantProfilePage({ params }: PageProps) {
     .from("resources")
     // Do not select private verification paths (cv_document_path, id_*); never expose on public profile.
     .select(
-      "id, name, headline, location, hourly_rate, years_experience, bio, profile_status, created_at, available_from, avatar_key, industry, resource_type, other_resource_type",
+      "id, name, headline, location, hourly_rate, years_experience, bio, profile_status, created_at, available_from, avatar_key, industry, resource_type, other_resource_type, id_validation_status",
     )
     .eq("id", id)
     .eq("profile_status", "approved")
@@ -198,6 +199,7 @@ export default async function ConsultantProfilePage({ params }: PageProps) {
       : [];
 
   const avatarKey = (data as { avatar_key?: string | null }).avatar_key ?? null;
+  const idValidationStatus = (data as { id_validation_status?: string | null }).id_validation_status ?? null;
   const avatarVisual = getPublicTalentAvatarDisplay(avatarKey, headline, bio);
 
   const statShell =
@@ -243,7 +245,10 @@ export default async function ConsultantProfilePage({ params }: PageProps) {
 
               <div className="min-w-0 flex-1 text-center md:text-left">
                 <p className={accentEyebrow}>Talent profile</p>
-                <h1 className="mt-2 text-3xl font-bold tracking-tight text-white md:text-4xl">{displayName}</h1>
+                <div className="mt-2 flex flex-wrap items-center justify-center gap-2 md:justify-start">
+                  <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl">{displayName}</h1>
+                  {idValidationStatus === "verified" ? <IdNumberVerifiedIndicator /> : null}
+                </div>
                 <p className="mt-2 text-[11px] font-semibold uppercase tracking-widest text-orange-400">{categoryLine}</p>
                 <p className="mt-2 text-lg text-white/70 md:text-xl">{publicTitle}</p>
 

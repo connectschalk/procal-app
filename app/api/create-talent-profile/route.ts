@@ -1,3 +1,4 @@
+import { normalizeSaIdNumberInput } from "@/lib/sa-id-number";
 import { isValidTalentAvatarKey } from "@/lib/talent-avatar-library";
 import { OTHER_TALENT_OPTION, isCoreTalentIndustry } from "@/lib/talent-taxonomy";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
@@ -14,6 +15,8 @@ type Body = {
   resource_type?: unknown;
   other_resource_type?: unknown;
   avatar_key?: unknown;
+  /** Optional digits-only SA ID; validated separately via /api/validate-id-number */
+  id_number?: unknown;
 };
 
 function parseHourlyRate(v: unknown): { ok: true; value: number | null } | { ok: false } {
@@ -117,6 +120,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "other_resource_type is required when using Other" }, { status: 400 });
   }
 
+  let id_number: string | null = null;
+  if ("id_number" in json) {
+    if (json.id_number === null || json.id_number === "") {
+      id_number = null;
+    } else if (typeof json.id_number === "string") {
+      const digits = normalizeSaIdNumberInput(json.id_number);
+      id_number = digits === "" ? null : digits;
+    } else {
+      return NextResponse.json({ success: false, error: "Invalid id_number" }, { status: 400 });
+    }
+  }
+
   const admin = createServiceRoleSupabase();
   if (!admin) {
     return NextResponse.json(
@@ -156,6 +171,7 @@ export async function POST(request: Request) {
     avatar_key,
     claimed: true,
     profile_status: "approved",
+    ...(id_number != null ? { id_number } : {}),
   };
 
   const { data: inserted, error: insertError } = await admin

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IdNumberVerifiedIndicator } from "@/components/id-number-verified-indicator";
 import { getPublicTalentAvatarDisplay } from "@/lib/talent-avatar-library";
 import { getResourceTypeLabel } from "@/lib/resource-display";
 
@@ -20,6 +21,8 @@ export type MarketplaceResource = {
   available_from: string | null;
   /** Earliest blocked_date >= today for this resource, if any */
   next_blocked_date: string | null;
+  /** When `verified`, show ID number verified badge (SA ID format check only). */
+  id_validation_status: string | null;
 };
 
 const ACCENT = "#ff6a00";
@@ -73,7 +76,12 @@ export function MarketplaceConsultantGrid({
                       <span className="text-lg leading-none">{avatar.primary}</span>
                     )}
                   </div>
-                  <h2 className="text-lg font-semibold tracking-tight text-white">{displayName}</h2>
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-lg font-semibold tracking-tight text-white">{displayName}</h2>
+                      {resource.id_validation_status === "verified" ? <IdNumberVerifiedIndicator /> : null}
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <div className="space-y-1 text-xs leading-snug">

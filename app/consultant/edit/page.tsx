@@ -14,6 +14,7 @@ import {
 } from "@/lib/talent-taxonomy";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import Link from "next/link";
+import { isValidSaIdNumberFormat, normalizeSaIdNumberInput } from "@/lib/sa-id-number";
 import {
   startTransition,
   useCallback,
@@ -119,7 +120,13 @@ export default function ConsultantEditProfilePage() {
   const [showCreateChecklist, setShowCreateChecklist] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [blockedDatesCount, setBlockedDatesCount] = useState(0);
+  const [idNumberInput, setIdNumberInput] = useState("");
+  const [idValidationStatus, setIdValidationStatus] = useState<string>("not_started");
+  const [idValidating, setIdValidating] = useState(false);
+  const [idValidationBanner, setIdValidationBanner] = useState<string | null>(null);
   const createChecklistRef = useRef<HTMLDivElement | null>(null);
+  const verifiedIdDigitsRef = useRef<string | null>(null);
+  const lastFailedIdDigitsRef = useRef<string | null>(null);
   const profileSectionRef = useRef<HTMLDivElement | null>(null);
   const photoSectionRef = useRef<HTMLDivElement | null>(null);
   const docsSectionRef = useRef<HTMLDivElement | null>(null);
@@ -220,11 +227,14 @@ export default function ConsultantEditProfilePage() {
     setSaveModalOpen(false);
     setPhotoSignedUrl(null);
     setBlockedDatesCount(0);
+    setIdValidating(false);
+    setIdValidationBanner(null);
+    verifiedIdDigitsRef.current = null;
 
     const { data, error: fetchError } = await supabase
       .from("resources")
       .select(
-        "id, name, headline, bio, hourly_rate, location, industry, resource_type, other_resource_type, claimed, avatar_key, profile_photo_path, available_from, cv_document_path, id_front_document_path, id_back_document_path",
+        "id, name, headline, bio, hourly_rate, location, industry, resource_type, other_resource_type, claimed, avatar_key, profile_photo_path, available_from, cv_document_path, id_front_document_path, id_back_document_path, id_number, id_validation_status",
       )
       .ilike("contact_email", trimmed);
 
@@ -240,6 +250,7 @@ export default function ConsultantEditProfilePage() {
     if (rows.length === 0) {
       setNoProfile(true);
       setDashboardEmail(trimmed);
+      setIdValidationStatus("not_started");
       const defaultAvatar = TALENT_AVATAR_OPTIONS[0]?.key ?? null;
       if (defaultAvatar != null) {
         setAvatarKey((prev) => prev ?? defaultAvatar);
@@ -269,6 +280,8 @@ export default function ConsultantEditProfilePage() {
       cv_document_path: string | null;
       id_front_document_path: string | null;
       id_back_document_path: string | null;
+      id_number: string | null;
+      id_validation_status: string | null;
     };
 
     setDashboardEmail(trimmed);
@@ -295,6 +308,16 @@ export default function ConsultantEditProfilePage() {
     setCvPath(row.cv_document_path ?? null);
     setIdFrontPath(row.id_front_document_path ?? null);
     setIdBackPath(row.id_back_document_path ?? null);
+
+    const idDigits = normalizeSaIdNumberInput((row.id_number as string | null) ?? "");
+    setIdNumberInput(idDigits);
+    const ivs = (row.id_validation_status as string | null)?.trim() || "not_started";
+    setIdValidationStatus(ivs);
+    if (ivs === "verified" && idDigits.length === 13) {
+      verifiedIdDigitsRef.current = idDigits;
+    } else {
+      verifiedIdDigitsRef.current = null;
+    }
 
     const { count } = await supabase
       .from("resource_blocked_dates")
@@ -330,6 +353,70 @@ export default function ConsultantEditProfilePage() {
     dashboardEmail.trim() !== "" &&
     profilePhotoPath != null &&
     profilePhotoPath.trim() !== "";
+  const normalizedIdDigits = useMemo(() => normalizeSaIdNumberInput(idNumberInput), [idNumberInput]);
+
+  const validateIdNumberNow = useCallback(async (digits: string, force = false) => {
+    if (force) {
+      lastFailedIdDigitsRef.current = null;
+    }
+    if (digits.length !== 13) {
+      setIdValidationStatus("failed");
+      setIdValidationBanner("We could not verify this ID number. Please check the number.");
+      lastFailedIdDigitsRef.current = null;
+      return;
+    }
+    if (!isValidSaIdNumberFormat(digits)) {
+      setIdValidationStatus("failed");
+      setIdValidationBanner("We could not verify this ID number. Please check the number.");
+      lastFailedIdDigitsRef.current = digits;
+      return;
+    }
+    setIdValidating(true);
+    setIdValidationBanner(null);
+    try {
+      const res = await fetch("/api/validate-id-number", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idNumber: digits }),
+      });
+      const j = (await res.json()) as { ok?: boolean; status?: string; message?: string };
+      if (j.status === "verified") {
+        setIdValidationStatus("verified");
+        verifiedIdDigitsRef.current = digits;
+        lastFailedIdDigitsRef.current = null;
+        setIdValidationBanner(null);
+      } else {
+        setIdValidationStatus("failed");
+        lastFailedIdDigitsRef.current = digits;
+        verifiedIdDigitsRef.current = null;
+        setIdValidationBanner(
+          typeof j.message === "string" && j.message.trim() !== ""
+            ? j.message
+            : "We could not verify this ID number. Please check the number.",
+        );
+      }
+    } catch {
+      setIdValidationStatus("failed");
+      lastFailedIdDigitsRef.current = digits;
+      verifiedIdDigitsRef.current = null;
+      setIdValidationBanner("We could not verify this ID number. Please check the number.");
+    } finally {
+      setIdValidating(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!resourceId || !canEdit) return;
+    if (normalizedIdDigits.length !== 13) return;
+    if (!isValidSaIdNumberFormat(normalizedIdDigits)) return;
+    if (normalizedIdDigits === verifiedIdDigitsRef.current) return;
+    if (normalizedIdDigits === lastFailedIdDigitsRef.current) return;
+    const t = window.setTimeout(() => {
+      void validateIdNumberNow(normalizedIdDigits, false);
+    }, 700);
+    return () => window.clearTimeout(t);
+  }, [normalizedIdDigits, resourceId, canEdit, validateIdNumberNow]);
+
   const selectedIndustry = isCoreTalentIndustry(industry) ? industry : null;
   const resourceTypeOptions = useMemo(() => {
     if (industry === OTHER_TALENT_OPTION) return [OTHER_TALENT_OPTION];
@@ -472,6 +559,7 @@ export default function ConsultantEditProfilePage() {
           resource_type: resourceType.trim(),
           other_resource_type: otherResourceType.trim() || null,
           avatar_key: avatarKey,
+          id_number: normalizedIdDigits === "" ? null : normalizedIdDigits,
         }),
       });
       const raw = await res.text();
@@ -1168,6 +1256,81 @@ export default function ConsultantEditProfilePage() {
                         className={inputClass}
                       />
                     </label>
+
+                    <div className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-medium text-zinc-400">South African ID number</span>
+                        {idValidationStatus === "verified" && normalizedIdDigits.length === 13 ? (
+                          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+                            <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                              <path
+                                fillRule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.114-.958l-3.804 4.23-1.677-1.678a.75.75 0 10-1.06 1.061l2.25 2.25a.75.75 0 001.114-.002l4.291-4.771z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                            ID number verified
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-xs leading-relaxed text-white/50">
+                        We validate the number format with Check ID. This does not verify your name or that you are the
+                        ID holder.
+                      </p>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="off"
+                          maxLength={13}
+                          value={idNumberInput}
+                          onChange={(e) => {
+                            lastFailedIdDigitsRef.current = null;
+                            const next = normalizeSaIdNumberInput(e.target.value);
+                            setIdNumberInput(next);
+                            setIdValidationBanner(null);
+                            if (next !== verifiedIdDigitsRef.current) {
+                              setIdValidationStatus((prev) => (prev === "verified" ? "not_started" : prev));
+                            }
+                          }}
+                          placeholder="13 digits"
+                          className={`${inputClass} sm:flex-1`}
+                        />
+                        <button
+                          type="button"
+                          disabled={
+                            idValidating ||
+                            !resourceId ||
+                            normalizedIdDigits.length !== 13 ||
+                            !isValidSaIdNumberFormat(normalizedIdDigits)
+                          }
+                          onClick={() => void validateIdNumberNow(normalizedIdDigits, true)}
+                          className="shrink-0 rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-sm font-semibold text-white transition hover:border-orange-500/40 hover:bg-black/45 disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          {idValidating ? "Validating…" : "Validate ID number"}
+                        </button>
+                      </div>
+                      {!resourceId ? (
+                        <p className="text-xs text-amber-200/85">
+                          Save your profile first. After your profile exists, you can validate your ID number here.
+                        </p>
+                      ) : null}
+                      {idValidating ? (
+                        <p className="text-xs text-white/55" aria-live="polite">
+                          Checking your ID number…
+                        </p>
+                      ) : null}
+                      {normalizedIdDigits.length === 13 && !isValidSaIdNumberFormat(normalizedIdDigits) ? (
+                        <p className="text-xs leading-relaxed text-amber-200/90" role="status">
+                          This does not look like a valid South African ID number (check the digits).
+                        </p>
+                      ) : null}
+                      {idValidationStatus === "failed" && idValidationBanner != null ? (
+                        <p className="text-xs leading-relaxed text-amber-200/95" role="alert">
+                          {idValidationBanner}
+                        </p>
+                      ) : null}
+                    </div>
 
                     {documentsIncomplete ? (
                       <p className="rounded-xl border border-amber-500/20 bg-amber-950/20 px-3 py-2 text-xs leading-relaxed text-amber-100/90">

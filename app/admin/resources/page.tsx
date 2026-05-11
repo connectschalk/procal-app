@@ -1,7 +1,7 @@
 import { AdminResourcesClient, type AdminResourceRow } from "@/components/admin-resources-client";
 import { AppTopNav } from "@/components/app-top-nav";
 import { requireAdmin } from "@/lib/require-role";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +10,12 @@ type RowWithCreated = AdminResourceRow & { created_at: string | null };
 export default async function AdminResourcesPage() {
   await requireAdmin();
 
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("resources")
-    .select("id, name, headline, location, profile_status, created_at")
+    .select(
+      "id, name, headline, location, profile_status, created_at, id_number, id_validation_status, id_validated_at, id_dob, id_age, id_gender, id_citizenship, id_validation_error",
+    )
     .order("created_at", { ascending: false });
 
   const mapped: RowWithCreated[] = (data ?? []).map((r) => ({
@@ -22,6 +25,14 @@ export default async function AdminResourcesPage() {
     location: r.location as string | null,
     profile_status: r.profile_status as string | null,
     created_at: (r.created_at as string | null) ?? null,
+    id_number: (r.id_number as string | null) ?? null,
+    id_validation_status: (r.id_validation_status as string | null) ?? null,
+    id_validated_at: (r.id_validated_at as string | null) ?? null,
+    id_dob: (r.id_dob as string | null) ?? null,
+    id_age: typeof r.id_age === "number" && Number.isFinite(r.id_age) ? r.id_age : null,
+    id_gender: (r.id_gender as string | null) ?? null,
+    id_citizenship: (r.id_citizenship as string | null) ?? null,
+    id_validation_error: (r.id_validation_error as string | null) ?? null,
   }));
 
   const draftCount = mapped.filter((r) => r.profile_status === "draft").length;
@@ -41,6 +52,14 @@ export default async function AdminResourcesPage() {
       headline: r.headline,
       location: r.location,
       profile_status: r.profile_status,
+      id_number: r.id_number,
+      id_validation_status: r.id_validation_status,
+      id_validated_at: r.id_validated_at,
+      id_dob: r.id_dob,
+      id_age: r.id_age,
+      id_gender: r.id_gender,
+      id_citizenship: r.id_citizenship,
+      id_validation_error: r.id_validation_error,
     }));
 
   return (

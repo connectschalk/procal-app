@@ -44,6 +44,18 @@ const FORBIDDEN_DOCUMENT_KEYS = [
   "id_back_document_path",
 ] as const;
 
+const FORBIDDEN_ID_VALIDATION_KEYS = [
+  "id_number",
+  "id_validation_status",
+  "id_validated_at",
+  "id_validation_response",
+  "id_dob",
+  "id_age",
+  "id_gender",
+  "id_citizenship",
+  "id_validation_error",
+] as const;
+
 export async function POST(request: Request) {
   let json: Body;
   try {
@@ -57,6 +69,14 @@ export async function POST(request: Request) {
     if (Object.prototype.hasOwnProperty.call(raw, k)) {
       return NextResponse.json(
         { success: false, error: `Cannot update ${k} via this endpoint; use the document upload API.` },
+        { status: 400 },
+      );
+    }
+  }
+  for (const k of FORBIDDEN_ID_VALIDATION_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(raw, k)) {
+      return NextResponse.json(
+        { success: false, error: `Cannot update ${k} via this endpoint; use the ID validation API.` },
         { status: 400 },
       );
     }

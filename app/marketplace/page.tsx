@@ -18,7 +18,7 @@ export default async function MarketplacePage() {
   const { data, error } = await supabase
     .from("resources")
     .select(
-      "id, name, headline, location, hourly_rate, years_experience, bio, profile_status, created_at, available_from, avatar_key, industry, resource_type, other_resource_type",
+      "id, name, headline, location, hourly_rate, years_experience, bio, profile_status, created_at, available_from, avatar_key, industry, resource_type, other_resource_type, id_validation_status",
     )
     .eq("profile_status", "approved")
     .order("created_at", { ascending: false });
@@ -78,6 +78,7 @@ export default async function MarketplacePage() {
       other_resource_type: (r.other_resource_type as string | null) ?? null,
       available_from: af != null && String(af).trim() !== "" ? String(af).slice(0, 10) : null,
       next_blocked_date: nextBlocked,
+      id_validation_status: (r.id_validation_status as string | null) ?? null,
     };
   });
   const relationshipMap = await getCompanyRelationshipMap(resources.map((resource) => resource.id));

@@ -1,13 +1,11 @@
 /**
- * Email confirmation / OAuth PKCE callback.
+ * OAuth PKCE callback (and legacy email confirmation links that still point here).
  *
- * Supabase Auth → Authentication → Email templates (Confirm signup):
- * The confirmation link must return users to this route. Prefer setting
- * Site URL + Redirect URLs in the Supabase dashboard, and use `emailRedirectTo`
- * from the app (see signup-form). If you customize the template body, the
- * confirmation URL should include redirect_to your app callback, e.g.:
- *   {{ .ConfirmationURL }}&redirect_to=https://procal.co.za/auth/callback
- * (Use your real production origin; local dev: http://localhost:3000/auth/callback)
+ * **New sign-ups:** `signup-form` sets `emailRedirectTo` to `/auth/confirmed` so users
+ * land on the branded activation page (modal + onboarding routing) instead of this route.
+ *
+ * Keep this route in Supabase **Redirect URLs** for OAuth and older confirmation links.
+ * Email template may use `{{ .ConfirmationURL }}` with `redirect_to` matching your Site URL.
  */
 
 import { dashboardPathForRole } from "@/lib/auth-routing";

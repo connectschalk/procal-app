@@ -58,7 +58,7 @@ export function SignupForm({ initialRole }: { initialRole: SignupRole }) {
       password,
       options: {
         data: { role },
-        emailRedirectTo: `${siteUrl}/auth/callback`,
+        emailRedirectTo: `${siteUrl}/auth/confirmed`,
       },
     });
 

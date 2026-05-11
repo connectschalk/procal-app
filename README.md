@@ -37,12 +37,17 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 ## Supabase email confirmation
 
-With email confirmation enabled, the app sets `emailRedirectTo` to `${NEXT_PUBLIC_SITE_URL}/auth/callback` when **`NEXT_PUBLIC_SITE_URL`** is set (e.g. `https://procal.co.za`), so confirmation links open production rather than localhost. If unset, it falls back to the browser origin during sign-up (fine for local dev).
+With email confirmation enabled, sign-up sets `emailRedirectTo` to `${NEXT_PUBLIC_SITE_URL}/auth/confirmed` when **`NEXT_PUBLIC_SITE_URL`** is set (e.g. `https://procal.co.za`), so confirmation links open production rather than localhost. If unset, it falls back to the browser origin during sign-up (fine for local dev). Users land on a branded **Account activated** page with a login dialog and onboarding-aware redirects.
 
-In the Supabase dashboard, add your callback URL under **Authentication → URL configuration → Redirect URLs** (e.g. `https://procal.co.za/auth/callback` and `http://localhost:3000/auth/callback` for dev).
+In the Supabase dashboard, under **Authentication → URL configuration → Redirect URLs**, add at least:
 
-If you customize the **Confirm signup** email template, ensure the link still reaches `/auth/callback` (the default `{{ .ConfirmationURL }}` is usually enough when redirect URLs are configured). To append `redirect_to` explicitly, you can use:
+- `http://localhost:3000/auth/confirmed`
+- `http://localhost:3000/auth/callback` (OAuth and legacy confirmation links)
+- `https://YOUR-PROCAL-DOMAIN/auth/confirmed`
+- `https://YOUR-PROCAL-DOMAIN/auth/callback`
 
-`{{ .ConfirmationURL }}&redirect_to=https://procal.co.za/auth/callback`
+Set **Site URL** to your production Procal origin.
 
-(Replace the host with your production origin.)
+If you customize the **Confirm signup** email template, the default `{{ .ConfirmationURL }}` is usually enough when redirect URLs are configured. To append `redirect_to` explicitly, use your production host, for example:
+
+`{{ .ConfirmationURL }}&redirect_to=https://procal.co.za/auth/confirmed`

@@ -1,5 +1,6 @@
 "use client";
 
+import { todayCalendarIsoJohannesburg } from "@/lib/resource-availability";
 import { useMemo, useState } from "react";
 
 const WEEKDAY_LABELS_MON = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
@@ -13,11 +14,6 @@ function localIsoFromYmd(year: number, monthIndex: number, day: number): string 
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const dayStr = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${dayStr}`;
-}
-
-function localIsoToday(): string {
-  const n = new Date();
-  return localIsoFromYmd(n.getFullYear(), n.getMonth(), n.getDate());
 }
 
 function formatMedium(iso: string): string {
@@ -73,11 +69,14 @@ export function PublicAvailabilityCalendar({
   availableFrom,
   blockedDates,
   theme = "light",
+  suppressHeading = false,
 }: {
   availableFrom: string | null;
   blockedDates: PublicBlockedDate[];
   /** Dark styling for premium public profile pages */
   theme?: "light" | "dark";
+  /** When true, omit the top "Availability" heading (parent already titled the section). */
+  suppressHeading?: boolean;
 }) {
   const isDark = theme === "dark";
   const [visibleMonth, setVisibleMonth] = useState(() => {
@@ -103,7 +102,7 @@ export function PublicAvailabilityCalendar({
       ? String(availableFrom).trim().slice(0, 10)
       : null;
   const effectiveFrom = fromRaw != null && ISO_DATE_RE.test(fromRaw) ? fromRaw : null;
-  const todayIso = localIsoToday();
+  const todayIso = todayCalendarIsoJohannesburg();
 
   const cells = useMemo(
     () => buildMonthCells(visibleMonth.year, visibleMonth.month),
@@ -148,9 +147,9 @@ export function PublicAvailabilityCalendar({
 
   return (
     <div className={rootClass}>
-      <h2 className={headingClass}>Availability</h2>
+      {suppressHeading ? null : <h2 className={headingClass}>Availability</h2>}
 
-      <div className="mt-4 space-y-1">
+      <div className={suppressHeading ? "space-y-1" : "mt-4 space-y-1"}>
         <p className={metaLead}>
           Available from: <span className={metaStrong}>{effectiveFrom != null ? formatMedium(effectiveFrom) : "Not specified"}</span>
         </p>

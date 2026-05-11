@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { IdNumberVerifiedIndicator } from "@/components/id-number-verified-indicator";
+import { PublicAvailabilitySummary } from "@/components/public-availability-summary";
+import { computePublicAvailabilityView } from "@/lib/resource-availability";
 import { getPublicTalentAvatarDisplay } from "@/lib/talent-avatar-library";
 import { getResourceTypeLabel } from "@/lib/resource-display";
 
@@ -19,8 +21,10 @@ export type MarketplaceResource = {
   other_resource_type: string | null;
   /** ISO date YYYY-MM-DD or null when unset */
   available_from: string | null;
-  /** Earliest blocked_date >= today for this resource, if any */
-  next_blocked_date: string | null;
+  /** All blocked dates for this resource (YYYY-MM-DD), same source as /talent/availability */
+  blocked_dates_iso: string[];
+  /** False when `resource_blocked_dates` could not be loaded — do not assume available */
+  blocked_data_load_ok: boolean;
   /** When `verified`, show ID number verified badge (SA ID format check only). */
   id_validation_status: string | null;
 };
@@ -33,12 +37,6 @@ function formatRate(rate: number | null) {
     style: "currency",
     currency: "ZAR",
   }).format(rate)} / hr`;
-}
-
-function formatCardDate(iso: string): string {
-  const d = new Date(`${iso}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return new Intl.DateTimeFormat("en-ZA", { dateStyle: "medium" }).format(d);
 }
 
 export function MarketplaceConsultantGrid({
@@ -62,6 +60,12 @@ export function MarketplaceConsultantGrid({
             const avatar = getPublicTalentAvatarDisplay(resource.avatar_key, resource.headline, resource.bio);
             const displayName = resource.can_reveal_identity ? resource.name : resource.anonymized_display_name;
             const resourceTypeLabel = getResourceTypeLabel(resource);
+            const availabilityView = computePublicAvailabilityView({
+              blockedDataLoadSucceeded: resource.blocked_data_load_ok,
+              blockedDatesIso: resource.blocked_dates_iso,
+              availableFromIso: resource.available_from,
+              selectedFilterIso: filterIso !== "" ? filterIso : null,
+            });
             return (
               <>
                 <div className="mb-3 flex items-center gap-3">
@@ -84,38 +88,7 @@ export function MarketplaceConsultantGrid({
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <div className="space-y-1 text-xs leading-snug">
-                    {filterIso !== "" ? (
-                      <p>
-                        <span className="text-zinc-500">Availability</span>{" "}
-                        <span className="font-medium" style={{ color: ACCENT }}>
-                          Available on {formatCardDate(filterIso)}
-                        </span>
-                      </p>
-                    ) : resource.available_from != null && resource.available_from.trim() !== "" ? (
-                      <p>
-                        <span className="text-zinc-500">Availability</span>{" "}
-                        <span className="font-medium text-zinc-200">
-                          From {formatCardDate(resource.available_from)}
-                        </span>
-                      </p>
-                    ) : (
-                      <p>
-                        <span className="text-zinc-500">Availability</span>{" "}
-                        <span className="font-medium" style={{ color: ACCENT }}>
-                          Available now
-                        </span>
-                      </p>
-                    )}
-                    {resource.next_blocked_date != null &&
-                    resource.next_blocked_date.trim() !== "" &&
-                    (filterIso === "" || resource.next_blocked_date > filterIso) ? (
-                      <p className="text-zinc-500">
-                        Next unavailable:{" "}
-                        <span className="text-zinc-400">{formatCardDate(resource.next_blocked_date)}</span>
-                      </p>
-                    ) : null}
-                  </div>
+                  <PublicAvailabilitySummary view={availabilityView} size="xs" />
                   <div className="space-y-0.5">
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-orange-400">
                       {resource.industry?.trim() || "Industry not listed"}

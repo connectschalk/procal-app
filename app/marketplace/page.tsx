@@ -7,13 +7,6 @@ import { supabase } from "@/lib/supabase";
 const MISSING_TABLE_ERROR_CODE = "42P01";
 const ACCENT = "#ff6a00";
 
-function localIsoDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
 export default async function MarketplacePage() {
   const { data, error } = await supabase
     .from("resources")
@@ -27,13 +20,15 @@ export default async function MarketplacePage() {
   const resourceIds = baseRows.map((r) => r.id as string);
 
   let blockedDateRows: { resource_id: string; blocked_date: string }[] = [];
+  let blockedDataLoadOk = true;
   if (resourceIds.length > 0) {
     const { data: blockedData, error: blockedError } = await supabase
       .from("resource_blocked_dates")
       .select("resource_id, blocked_date")
       .in("resource_id", resourceIds);
 
-    if (!blockedError && blockedData != null) {
+    blockedDataLoadOk = blockedError == null;
+    if (blockedDataLoadOk && blockedData != null) {
       blockedDateRows = blockedData.map((row) => ({
         resource_id: row.resource_id as string,
         blocked_date: String(row.blocked_date).slice(0, 10),
@@ -41,27 +36,20 @@ export default async function MarketplacePage() {
     }
   }
 
-  const today = localIsoDate(new Date());
-  const upcomingBlockedByResource = new Map<string, string[]>();
+  const blockedDatesByResource = new Map<string, string[]>();
   for (const row of blockedDateRows) {
-    if (row.blocked_date < today) continue;
-    const list = upcomingBlockedByResource.get(row.resource_id);
+    const list = blockedDatesByResource.get(row.resource_id);
     if (list == null) {
-      upcomingBlockedByResource.set(row.resource_id, [row.blocked_date]);
+      blockedDatesByResource.set(row.resource_id, [row.blocked_date]);
     } else {
       list.push(row.blocked_date);
     }
-  }
-  for (const list of upcomingBlockedByResource.values()) {
-    list.sort((a, b) => a.localeCompare(b));
   }
 
   const resources: MarketplaceResource[] = baseRows.map((r) => {
     const id = r.id as string;
     const headline = (r.headline as string | null) ?? null;
     const af = r.available_from as string | null | undefined;
-    const upcoming = upcomingBlockedByResource.get(id);
-    const nextBlocked = upcoming != null && upcoming.length > 0 ? upcoming[0] : null;
     return {
       id,
       name: (r.name as string) ?? "",
@@ -77,7 +65,8 @@ export default async function MarketplacePage() {
       resource_type: (r.resource_type as string | null) ?? null,
       other_resource_type: (r.other_resource_type as string | null) ?? null,
       available_from: af != null && String(af).trim() !== "" ? String(af).slice(0, 10) : null,
-      next_blocked_date: nextBlocked,
+      blocked_dates_iso: blockedDatesByResource.get(id) ?? [],
+      blocked_data_load_ok: blockedDataLoadOk,
       id_validation_status: (r.id_validation_status as string | null) ?? null,
     };
   });

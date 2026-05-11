@@ -5,6 +5,8 @@ import { isCompanyProfileComplete } from "@/lib/company-profile";
 import { getCompanyProfileByUserId, getUserRoleById } from "@/lib/company-profile-server";
 import { getAnonymizedTalentDisplayName, getCompanyRelationshipMap } from "@/lib/talent-identity";
 import { getPublicTalentAvatarDisplay } from "@/lib/talent-avatar-library";
+import { PublicAvailabilitySummary } from "@/components/public-availability-summary";
+import { computePublicAvailabilityView } from "@/lib/resource-availability";
 import { getResourceCategoryLabel } from "@/lib/resource-display";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { supabase } from "@/lib/supabase";
@@ -198,6 +200,13 @@ export default async function ConsultantProfilePage({ params }: PageProps) {
         }))
       : [];
 
+  const publicAvailabilityView = computePublicAvailabilityView({
+    blockedDataLoadSucceeded: blockedError == null,
+    blockedDatesIso: blockedForCalendar.map((r) => r.blocked_date),
+    availableFromIso: availableFrom,
+    selectedFilterIso: null,
+  });
+
   const avatarKey = (data as { avatar_key?: string | null }).avatar_key ?? null;
   const idValidationStatus = (data as { id_validation_status?: string | null }).id_validation_status ?? null;
   const avatarVisual = getPublicTalentAvatarDisplay(avatarKey, headline, bio);
@@ -287,11 +296,18 @@ export default async function ConsultantProfilePage({ params }: PageProps) {
           </section>
 
           <section className={`${glassCard} mt-6`}>
-            <PublicAvailabilityCalendar
-              availableFrom={availableFrom}
-              blockedDates={blockedForCalendar}
-              theme="dark"
-            />
+            <h2 className={accentEyebrow}>Availability</h2>
+            <div className="mt-4">
+              <PublicAvailabilitySummary view={publicAvailabilityView} size="sm" />
+            </div>
+            <div className="mt-6">
+              <PublicAvailabilityCalendar
+                availableFrom={availableFrom}
+                blockedDates={blockedForCalendar}
+                theme="dark"
+                suppressHeading
+              />
+            </div>
           </section>
 
           <section className={`${glassCard} mt-6`}>
